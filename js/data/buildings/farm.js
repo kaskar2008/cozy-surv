@@ -85,7 +85,7 @@ reg([
     },
   },
   {
-    id: 'flower_bed', name: 'Клумба', cat: 'farm', icon: '🌷', cost: { flowers: 3, stone: 2 }, h: 40, cozy: 3, drag: true,
+    id: 'flower_bed', name: 'Клумба', cat: 'farm', icon: '🌷', cost: { flowers: 3, stone: 2 }, h: 40, ph: 0, cozy: 3, drag: true,
     desc: 'Яркая клумба. Радует глаз, а пчёлы вокруг неё делают мёд быстрее.',
     tags: ['flowerpatch'],
     key: (b) => b.v % 5,

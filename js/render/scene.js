@@ -126,6 +126,16 @@ function drawOverlays(c, o, t) {
     const a = .55 + .25 * Math.sin(t * 5);
     diamond(c, sel.x, sel.y, sel.w || 1, sel.d || 1, `rgba(255,236,160,${a * .25})`, `rgba(255,226,120,${a})`, 2.2);
   }
+  // приказ, отданный на паузе: путь и цель (персонаж пойдёт, когда снимут паузу); время сцены на паузе стоит — пульсируем по часам
+  const pp = G.player.path;
+  if (!G.speed && pp && pp.length && !G.player.sleeping) {
+    const a = .6 + .3 * Math.sin(performance.now() / 1000 * 5), last = pp[pp.length - 1];
+    c.save(); c.setLineDash([5, 6]); c.lineCap = 'round'; c.lineWidth = 2.2; c.strokeStyle = 'rgba(255,236,160,.8)'; c.beginPath();
+    const s0 = proj(G.player.x, G.player.y, 1); c.moveTo(s0[0], s0[1]);
+    for (const q of pp) { const s = proj(q.x + .5, q.y + .5, 1); c.lineTo(s[0], s[1]); }
+    c.stroke(); c.restore();
+    diamond(c, last.x, last.y, 1, 1, `rgba(255,236,160,${a * .3})`, `rgba(255,226,120,${a})`, 2.2);
+  }
   if (R.hover && !R.ghost) diamond(c, R.hover.x, R.hover.y, R.hover.w || 1, R.hover.d || 1, 'rgba(255,255,255,.14)', 'rgba(255,255,255,.55)', 1.5);
   // призрак постройки
   const g = R.ghost;

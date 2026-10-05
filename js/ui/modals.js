@@ -1,6 +1,6 @@
 // Модальные окна: рюкзак, ручная работа, журнал, меню, гардероб, письма.
 import { h } from '../core/util.js';
-import { G, day } from '../game/state.js';
+import { G, day, season, isNight } from '../game/state.js';
 import { ITEMS, CATS, itemIcon, itemName } from '../data/items.js';
 import { STATIONS } from '../data/recipes.js';
 import * as eco from '../game/eco.js';
@@ -8,6 +8,7 @@ import * as api from '../game/api.js';
 import { S, toast as _t } from '../game/api.js';
 import { GOALS } from '../game/goals.js';
 import { ALL_SYN, cozyLevel } from '../game/cozy.js';
+import { BDEF } from '../data/buildings/index.js';
 import { SHIRTS, HATS } from '../render/entities.js';
 import { WALL_STYLES, FLOOR_STYLES, WALL_NAMES, FLOOR_NAMES } from '../data/furniture.js';
 import { homeOf, setStyle } from '../game/interior.js';
@@ -15,6 +16,7 @@ import { openModal, closeModal, toast } from './ui.js';
 import { save, wipe } from '../game/save.js';
 import { isMuted, setMuted, initAudio } from '../core/audio.js';
 import { UI } from './state.js';
+import { buffSum } from '../game/api.js';
 
 export function openInventory() {
   const body = h('div', { class: 'inv' });
@@ -50,8 +52,8 @@ export function openCraft() {
 }
 
 const CONTROLS_PC = [
-  ['ЛКМ', 'идти / собирать / выбрать постройку'], ['ПКМ + перетаскивание', 'двигать камеру'], ['Колесо / +−', 'приблизить, отдалить'], ['WASD / стрелки', 'камера'], ['Пробел', 'камера к персонажу'],
-  ['B', 'свернуть панель строительства'], ['R', 'повернуть постройку'], ['X', 'режим сноса'], ['Esc', 'отмена / закрыть / меню'], ['I · C · J', 'рюкзак · ручная работа · журнал'],
+  ['ЛКМ', 'идти / собирать / выбрать постройку'], ['ПКМ + перетаскивание / два пальца по тачпаду', 'двигать камеру'], ['Колесо / щипок / +−', 'приблизить, отдалить'], ['WASD / стрелки', 'камера'], ['Пробел', 'камера к персонажу'],
+  ['B', 'свернуть панель строительства'], ['R', 'повернуть постройку'], ['Shift + ЛКМ', 'не выходить из режима постройки (ставить подряд)'], ['X', 'режим сноса'], ['Esc', 'отмена / закрыть / меню'], ['I · C · J', 'рюкзак · ручная работа · журнал'],
   ['P · 1 · 2 · 3', 'пауза · скорость ×1 ×2 ×4'], ['F', 'сфотографировать остров'], ['M', 'звук'], ['Двойной клик по дому', 'войти внутрь'],
 ];
 const CONTROLS_TOUCH = [
@@ -61,17 +63,99 @@ const CONTROLS_TOUCH = [
 ];
 export const isTouch = () => UI.touch || (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches);
 
-export function openJournal(tab = 'goals') {
+// ---------------------------------------------------------------- состояние персонажа
+const NEED_INFO = [
+  ['thirst', '💧', 'Жажда', '#5aa8e0', 'Убывает со временем (во сне медленнее). Совсем без воды настроение сильно падает.',
+    'Напиться можно у бака, колодца или крана в доме, из ведра или из рек и озёр. Вода есть и в рюкзаке.'],
+  ['hunger', '🍞', 'Сытость', '#e0a24a', 'Убывает со временем (во сне медленнее). Голод портит настроение.',
+    'Ешь ягоды, овощи и готовую еду из рюкзака. Готовка у костра и на плите сытнее и добавляет настроения.'],
+  ['energy', '⚡', 'Бодрость', '#8fcf6a', 'Убывает, пока ты на ногах. Когда её мало, работа идёт медленнее.',
+    'Поспи: в доме, в палатке, на гамаке или спальнике. Короткая дрёма даёт немного сил днём.'],
+  ['warmth', '🔥', 'Тепло', '#e8714a', 'Плавно тянется к температуре вокруг. Холоднее зимой, ночью, в дождь и снег; тепло у огня и в натопленном доме.',
+    'Подойди к костру или печи, зайди в дом. Горячая ванна согревает сразу и надолго.'],
+  ['mood', '😊', 'Настроение', '#e87aa8', 'Складывается из остальных шкал, уюта острова, музыки, погоды и приятных занятий.',
+    'Строй уют (мебель, цветы, свет), читай, слушай музыку, держи другие шкалы выше. Помогают радуга, северное сияние и другие приятные события.'],
+];
+const stateWord = (v) => (v >= 75 ? 'отлично' : v >= 50 ? 'хорошо' : v >= 25 ? 'так себе' : 'плохо');
+function moodFactors() {
+  const n = G.needs, f = [], add = (ic, txt, good) => f.push(h('li', { class: good ? 'up' : 'down' }, `${good ? '▲' : '▼'} ${ic} ${txt}`));
+  if (G.cozy.total >= 6) add('🧸', `Уют острова (${Math.round(G.cozy.total)})`, true);
+  if (n.hunger + n.thirst + n.energy + n.warmth >= 300) add('👍', 'Основные нужды в порядке', true);
+  if (G.musicNear) add('🎵', 'Рядом музыка', true);
+  if (G.scene !== 'world' && G.weather.type === 'rain') add('🌧️', 'Дождь за окном, а ты дома', true);
+  if (G.scene === 'world' && G.weather.type === 'rain') add('🌧️', 'Мокнешь под дождём', false);
+  if (n.hunger < 15) add('🍞', 'Голод', false);
+  if (n.thirst < 15) add('💧', 'Сильная жажда', false);
+  if (n.warmth < 25) add('🥶', 'Замёрз', false);
+  if (n.energy < 15) add('😴', 'Нет сил', false);
+  const b = buffSum('mood'); if (b > 0) add('✨', `Приятные дела недавно (+${Math.round(b)})`, true);
+  return f;
+}
+export function openNeeds() {
+  const body = h('div', { class: 'needs-info' });
+  let timer = 0;
+  const draw = () => {
+    body.replaceChildren(
+      h('p', { class: 'muted' }, 'Шкалы не опасны: если их запустить, настроение упадёт, а работа и ходьба станут медленнее.'),
+      ...NEED_INFO.map(([k, ic, name, col, what, fix]) => {
+        const v = Math.round(G.needs[k]);
+        return h('div', { class: 'ni' + (v < 25 ? ' low' : '') },
+          h('div', { class: 'ni-top' }, h('span', { class: 'ni-ic' }, ic), h('b', null, name), h('span', { class: 'ni-v' }, `${v}% · ${stateWord(v)}`)),
+          h('div', { class: 'bar' }, h('i', { style: `width:${Math.max(2, v)}%;background:${col}` })),
+          h('p', null, what), h('p', { class: 'fix' }, '💡 ', fix),
+          k === 'mood' ? h('ul', { class: 'mood-f' }, ...moodFactors()) : null);
+      }));
+  };
+  draw();
+  timer = setInterval(() => { if (!document.body.contains(body)) clearInterval(timer); else draw(); }, 700);
+  openModal('🧍 Состояние', body, { onClose: () => clearInterval(timer) });
+}
+
+// ---------------------------------------------------------------- справочник рецептов
+const RECIPE_GROUPS = [
+  ['✋ Руки и мастерская', ['hand', 'workbench']],
+  ['🍲 Кухня и еда', ['campfire', 'pot', 'kettle', 'stove', 'oven', 'smoker', 'ferment', 'drying', 'quern']],
+  ['🏺 Ремёсла и искусство', ['kiln', 'loom', 'easel']],
+];
+const HEAT_NOTE = { self: 'на открытом огне', near: 'нужен горящий огонь рядом' };
+function recipesView() {
+  const bldOf = (st) => Object.values(BDEF).find((d) => d.station === st);
+  const rows = (st) => STATIONS[st].recipes.filter((r) => !r.hidden).map((r) => {
+    const outs = Object.entries(r.out), title = r.name || outs.map(([k, n]) => itemName(k) + (n > 1 ? ` ×${n}` : '')).join(', ');
+    return h('div', { class: 'rc' },
+      h('span', { class: 'rc-ic' }, itemIcon(outs[0][0])),
+      h('div', { class: 'rc-body' },
+        h('b', null, title),
+        h('div', null, ...Object.entries(r.in).map(([k, n]) => h('span', { class: 'chip ' + (eco.count(k) >= n ? '' : 'miss') }, `${n}${itemIcon(k)} ${itemName(k)}`))),
+        r.once || r.mood ? h('small', null, [r.once ? 'делается один раз' : '', r.mood ? `+${r.mood} к настроению` : ''].filter(Boolean).join(' · ')) : null),
+      h('span', { class: 'rc-t' }, `${r.t} с`));
+  });
+  const out = [h('p', { class: 'muted' }, 'Все рецепты острова по местам, где их готовят. Красные цифры показывают, чего сейчас не хватает в рюкзаке.')];
+  for (const [title, ids] of RECIPE_GROUPS) {
+    out.push(h('h3', null, title));
+    for (const st of ids) {
+      const S_ = STATIONS[st], d = bldOf(st), built = !d || api.isBuilt(d.id);
+      const notes = [S_.heat ? HEAT_NOTE[S_.heat] : '', S_.heatBoost ? 'быстрее рядом с огнём' : '', S_.water ? 'нужна вода (из труб или рюкзака)' : ''].filter(Boolean).join(' · ');
+      out.push(h('div', { class: 'rc-st' },
+        h('div', { class: 'rc-sh' }, h('b', null, `${S_.icon} ${S_.name}`), d ? h('span', { class: 'chip ' + (built ? 'ok' : '') }, built ? '✓ построено' : '🔒 ещё не построено') : h('span', { class: 'chip ok' }, 'всегда под рукой')),
+        notes ? h('small', null, notes) : null,
+        ...rows(st)));
+    }
+  }
+  return out;
+}
+
+export function openJournal(tab = 'goals', focus) {
   const body = h('div', { class: 'journal' });
   const tabs = h('div', { class: 'tabs' });
   const content = h('div', { class: 'jcontent' });
   const draw = (t) => {
-    tabs.replaceChildren(...[['goals', '🎯 Цели'], ['cozy', '🧸 Уют'], ['help', '❓ Подсказки']].map(([id, nm]) => h('button', { class: id === t ? 'on' : '', onclick: () => draw(id) }, nm)));
+    tabs.replaceChildren(...[['goals', '🎯 Цели'], ['cozy', '🧸 Уют'], ['recipes', '📜 Рецепты'], ['help', '❓ Подсказки']].map(([id, nm]) => h('button', { class: id === t ? 'on' : '', onclick: () => draw(id) }, nm)));
     content.replaceChildren();
     if (t === 'goals') {
       const done = GOALS.filter((g) => G.goals[g.id]).length;
       content.append(h('p', { class: 'muted' }, `Выполнено ${done} из ${GOALS.length}. Никакой спешки: цели — просто идеи, чем заняться. За каждую — небольшой подарок.`),
-        h('div', { class: 'goals' }, ...GOALS.map((g) => h('div', { class: 'goal' + (G.goals[g.id] ? ' done' : '') }, h('span', { class: 'gi' }, G.goals[g.id] ? '✅' : g.ic), h('div', null, h('b', null, g.name), h('small', null, g.desc)), h('em', null, Object.entries(g.reward).map(([k, v]) => `${v}${itemIcon(k)}`).join(' '))))));
+        h('div', { class: 'goals' }, ...GOALS.map((g) => h('div', { 'data-id': g.id, class: 'goal' + (G.goals[g.id] ? ' done' : '') }, h('span', { class: 'gi' }, G.goals[g.id] ? '✅' : g.ic), h('div', null, h('b', null, g.name), h('small', null, g.desc)), h('em', null, Object.entries(g.reward).map(([k, v]) => `${v}${itemIcon(k)}`).join(' '))))));
     } else if (t === 'cozy') {
       const lv = cozyLevel(G.cozy.total);
       content.append(h('div', { class: 'cz-big' }, h('div', { class: 'num' }, G.cozy.total), h('div', null, h('b', null, lv.name), h('small', null, `снаружи ${G.cozy.out} · внутри ${G.cozy.inn}${lv.next ? ` · до следующего уровня: ${lv.next - G.cozy.total}` : ''}`))),
@@ -81,6 +165,8 @@ export function openJournal(tab = 'goals') {
         content.append(h('h3', null, where === 'out' ? '🌳 Снаружи' : '🏠 Внутри дома'));
         content.append(h('div', { class: 'goals' }, ...ALL_SYN.filter((s) => s.where === where).map((s) => h('div', { class: 'goal' + (act.has(s.id) ? ' done' : '') }, h('span', { class: 'gi' }, act.has(s.id) ? '✨' : '▫️'), h('div', null, h('b', null, s.name), h('small', null, s.hint)), h('em', null, `+${s.pts}`)))));
       }
+    } else if (t === 'recipes') {
+      content.append(...recipesView());
     } else {
       content.append(h('h3', null, 'Управление'), h('div', { class: 'ctrl' }, ...(isTouch() ? CONTROLS_TOUCH : CONTROLS_PC).map(([k, v]) => h('div', null, h('kbd', null, k), h('span', null, v)))),
         h('h3', null, 'Как тут жить'),
@@ -93,9 +179,12 @@ export function openJournal(tab = 'goals') {
           h('li', null, 'Игра сохраняется сама. Можно закрыть вкладку и вернуться.')));
     }
   };
-  draw(tab);
+  draw(typeof tab === 'string' ? tab : 'goals');
   body.append(tabs, content);
   openModal('📖 Журнал', body, { cls: 'wide' });
+  // прокрутить к нужной цели и мигнуть ею
+  const el = focus && content.querySelector(`[data-id="${focus}"]`);
+  if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1800); }
 }
 export function openMenu() {
   const body = h('div', { class: 'menu' },

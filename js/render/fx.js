@@ -9,7 +9,7 @@ export const parts = [];
 export const floats = [];
 const MAXP = 700;
 
-export function spawn(o) { if (parts.length < MAXP) parts.push({ vx: 0, vy: 0, vz: 0, life: 1, max: 1, size: 3, col: '#fff', grav: 0, ...o, max: o.life ?? 1, sc: fxs.scope ?? G.scene }); }
+export function spawn(o) { if (parts.length < MAXP) parts.push({ live: !G.speed, vx: 0, vy: 0, vz: 0, life: 1, max: 1, size: 3, col: '#fff', grav: 0, ...o, max: o.life ?? 1, sc: fxs.scope ?? G.scene }); }
 export const smoke = (x, y, z) => spawn({ type: 'smoke', x: x + rnd(-.05, .05), y: y + rnd(-.05, .05), z, vz: rnd(10, 16), vx: rnd(.02, .08), vy: rnd(-.02, .02), life: rnd(2.2, 3.4), size: rnd(3, 5), col: '#d8d8d8' });
 export const steam = (x, y, z) => spawn({ type: 'smoke', x: x + rnd(-.2, .2), y: y + rnd(-.2, .2), z, vz: rnd(8, 14), life: rnd(1.4, 2.2), size: rnd(3, 5), col: '#ffffff', a: .5 });
 export const spark = (x, y, z) => spawn({ type: 'spark', x: x + rnd(-.1, .1), y: y + rnd(-.1, .1), z, vz: rnd(18, 34), vx: rnd(-.2, .2), vy: rnd(-.2, .2), life: rnd(.7, 1.3), size: 1.6, col: '#ffc060' });
@@ -18,16 +18,17 @@ export const hearts = (x, y, z) => { for (let i = 0; i < 4; i++) spawn({ type: '
 export const dust = (x, y, n = 8) => { for (let i = 0; i < n; i++) spawn({ type: 'smoke', x: x + rnd(-.6, .6), y: y + rnd(-.6, .6), z: 2, vz: rnd(4, 12), vx: rnd(-.3, .3), vy: rnd(-.3, .3), life: rnd(.6, 1.1), size: rnd(3, 6), col: '#c9b48a', a: .6 }); };
 export const note = (x, y, z) => spawn({ type: 'text', txt: pick(['♪', '♫', '♬']), x, y, z, vz: 18, vx: rnd(-.1, .1), life: 1.6, size: 13, col: '#ff9ec0' });
 export const drop = (x, y, z) => spawn({ type: 'spark', x, y, z, vz: 12, life: .6, size: 2, col: '#8fd0f2' });
-export function floatText(x, y, text, col = '#fff', z = 30) { floats.push({ x, y, z, text, col, life: 1.8, max: 1.8, sc: fxs.scope ?? G.scene }); }
+export function floatText(x, y, text, col = '#fff', z = 30) { floats.push({ live: !G.speed, x, y, z, text, col, life: 1.8, max: 1.8, sc: fxs.scope ?? G.scene }); }
 
-export function update(dt) {
+// dt — игровое время (на паузе 0), rdt — реальное: частицы, рождённые на паузе действиями игрока, доигрывают
+export function update(dt0, rdt = dt0) {
   for (let i = parts.length - 1; i >= 0; i--) {
-    const p = parts[i]; p.life -= dt;
+    const p = parts[i], dt = p.live ? rdt : dt0; p.life -= dt;
     if (p.life <= 0) { parts.splice(i, 1); continue; }
     p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vz -= p.grav * dt;
     if (p.type === 'smoke') p.size += dt * 2.2;
   }
-  for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i]; f.life -= dt; f.z += 14 * dt; if (f.life <= 0) floats.splice(i, 1); }
+  for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i], dt = f.live ? rdt : dt0; f.life -= dt; f.z += 14 * dt; if (f.life <= 0) floats.splice(i, 1); }
 }
 export function drawParts(c) {
   for (const p of parts) {

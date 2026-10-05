@@ -40,7 +40,6 @@ export function toggleBar() { UI.buildOpen = !UI.buildOpen; root.classList.toggl
 export function renderBar(soft) {
   const ins = inside(), cats = ins ? FCATS : BCATS, cur = ins ? UI.fcat : UI.cat;
   catRow.replaceChildren(...[
-    h('button', { class: 'cat tool' + (UI.tool === 'select' ? ' on' : ''), title: 'Обычный режим (Esc)', onclick: () => setTool('select') }, '🖐', h('span', null, 'Курсор')),
     ...cats.map((c) => h('button', { class: 'cat' + (c.id === cur && UI.tool !== 'demolish' ? ' on' : ''), onclick: () => { if (!UI.buildOpen) toggleBar(); if (ins) UI.fcat = c.id; else UI.cat = c.id; if (UI.tool === 'demolish') UI.tool = 'select'; renderBar(); sfx('ui'); } }, c.icon, h('span', null, c.name))),
     ins ? null : h('button', { class: 'cat tool' + (UI.tool === 'demolish' ? ' on' : ''), title: 'Снести постройку (X) — вернёт 60% материалов', onclick: () => setTool(UI.tool === 'demolish' ? 'select' : 'demolish') }, '🗑️', h('span', null, 'Снести')),
   ].filter(Boolean));

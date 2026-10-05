@@ -36,7 +36,9 @@ let ivEma = 16.7, lowT = 0, highT = 0, lastDown = -1e9;
 function frame(ts) {
   const el = ts - last;
   if (el < 12) { requestAnimationFrame(frame); return; }      // не больше ~60 кадров/с на 120–144 Гц экранах
-  const dt = Math.min(0.1, el / 1000); last = ts; time += dt;
+  const rdt = Math.min(0.1, el / 1000); last = ts;
+  // на паузе замираем всё анимированное: дождь, птицы, вода, дым, покачивание (сон считается ходом времени)
+  const paused = !G.speed && !G.player.sleeping, dt = paused ? 0 : rdt; time += dt;
   // адаптивное разрешение: если кадры дольше ~24 мс — снижаем плотность пикселей, при запасе возвращаем
   if (el < 250) {
     ivEma = ivEma * 0.95 + el * 0.05;
@@ -46,21 +48,21 @@ function frame(ts) {
   }
   try {
     let t0 = now();
-    updateInput(dt); t0 = mark('input', t0);
-    simulate(dt); t0 = mark('sim', t0);
-    fx.update(dt);
-    if (G.scene === 'world') fx.ambient(dt * (G.speed ? 1 : .2), time, G.weather.type);
+    updateInput(rdt); t0 = mark('input', t0);
+    simulate(rdt); t0 = mark('sim', t0);
+    fx.update(dt, rdt);
+    if (G.scene === 'world') fx.ambient(dt, time, G.weather.type);
     t0 = mark('fx', t0);
     if (G.scene === 'world') renderWorld(ctx, time, dt); else renderInterior(ctx, time, dt);
     t0 = mark('render', t0);
-    updateHUD(dt); updatePanel(dt); t0 = mark('ui', t0);
-    cardT -= dt; if (cardT <= 0) { cardT = .5; updateCards(); }
-    audioT -= dt;
+    updateHUD(rdt); updatePanel(rdt); t0 = mark('ui', t0);
+    cardT -= rdt; if (cardT <= 0) { cardT = .5; updateCards(); }
+    audioT -= rdt;
     if (audioT <= 0) {
       audioT = .5; const p = G.player;
       G.audioSt = { rain: G.wx.rain, night: darkness() > .55, fire: G.scene === 'world' ? Math.min(1, nearHeat(p.x, p.y, 7) * 2.2) : (G.interior?.heat ? .8 : 0), season: Math.floor(G.t / 300 / 6) % 4, indoor: G.scene !== 'world', chime: [...G.bMap.values()].some((b) => b.t === 'windchime') };
     }
-    if (G.audioSt) audio.ambient(dt, G.audioSt);
+    if (G.audioSt) audio.ambient(rdt, G.audioSt);
   } catch (e) { console.error(e); }
   requestAnimationFrame(frame);
 }

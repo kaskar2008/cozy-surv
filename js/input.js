@@ -22,7 +22,7 @@ import { initAudio, isMuted, setMuted, sfx } from './core/audio.js';
 import { save } from './game/save.js';
 
 const keys = new Set();
-let canvas, drag = null, placing = false, lastTile = '', lastXY = null, lastTapT = 0, lastTapKey = '', ghostKey = '', ghostT = 0, hoverT = 0;
+let canvas, drag = null, placing = false, placedOne = false, keepBuild = false, lastTile = '', lastXY = null, lastTapT = 0, lastTapKey = '', ghostKey = '', ghostT = 0, hoverT = 0;
 
 export function initInput(cv) {
   canvas = cv;
@@ -33,12 +33,28 @@ export function initInput(cv) {
   addEventListener('pointercancel', onUp);
   cv.addEventListener('pointerleave', (e) => { if (e.pointerType === 'touch') return; UI.mouse.in = false; R.ghost = null; R.hover = null; hideTip(); });
   cv.addEventListener('pointerenter', () => { UI.mouse.in = true; });
-  cv.addEventListener('wheel', (e) => { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0012)); }, { passive: false });
+  cv.addEventListener('wheel', onWheel, { passive: false });
   addEventListener('keydown', onKey);
   addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
   addEventListener('blur', () => keys.clear());
   // iOS: не давать странице масштабироваться жестами
   for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, (e) => e.preventDefault());
+  // Safari на маке: щипок по тачпаду приходит как gesturechange со scale, а не как wheel+ctrl
+  let gs = 1;
+  cv.addEventListener('gesturestart', () => { gs = 1; });
+  cv.addEventListener('gesturechange', (e) => { if (UI.touch || UI.modal) return; zoomAt(e.clientX, e.clientY, e.scale / gs); gs = e.scale; });
+}
+// Колесо: щипок на тачпаде (ctrl+wheel) и колесо мыши — масштаб; прокрутка двумя пальцами — движение камеры.
+let padUntil = 0;
+function onWheel(e) {
+  e.preventDefault();
+  if (UI.modal) return;
+  const now = performance.now();
+  // тачпад шлёт мелкие дробные дельты и часто deltaX; колесо мыши — крупные «ступеньки» только по Y
+  if (!e.ctrlKey && e.deltaMode === 0 && (e.deltaX !== 0 || Math.abs(e.deltaY) < 40 || (e.deltaY % 1 !== 0))) padUntil = now + 300;
+  if (e.ctrlKey || now >= padUntil) { zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0012))); return; }
+  if (inside()) return;
+  cam.goto = null; cam.x += e.deltaX / cam.zoom; cam.y += e.deltaY / cam.zoom; clampCam();
 }
 const inside = () => G.scene !== 'world';
 const curDef = () => (inside() ? UI.fdef : UI.def);
@@ -60,6 +76,7 @@ function onDown(e) {
       const m = mid(); gesture = { d: m.d, x: m.x, y: m.y }; drag = null; placing = false; return;
     }
   }
+  keepBuild = e.shiftKey;      // Shift — не выходить из режима постройки
   const bd = UI.tool === 'build' ? curDef() : null;
   UI.mouse.x = e.clientX; UI.mouse.y = e.clientY - liftFor(bd); UI.mouse.in = true;
   if (G.player.sleeping) { api.wakeUp(); return; }
@@ -85,6 +102,14 @@ function tap(x, y) {
   const dbl = performance.now() - lastTapT < 360 && key === lastTapKey;
   lastTapT = performance.now(); lastTapKey = key;
   if (inside()) clickInterior(x, y, dbl); else clickWorld(x, y, dbl);
+  queuedHint();
+}
+// на паузе приказ не теряется, а ждёт — говорим об этом (не чаще раза в несколько секунд)
+let hintT = -1e9;
+function queuedHint() {
+  const p = G.player;
+  if (G.speed || p.sleeping || !(p.path && p.path.length) || performance.now() - hintT < 6000) return;
+  hintT = performance.now(); toast('Приказ ждёт — сними паузу (P), и персонаж пойдёт', '');
 }
 function onMove(e) {
   if (UI.touch && pointers.has(e.pointerId)) {
@@ -115,7 +140,7 @@ function onMove(e) {
       const g = R.ghost, from = lastXY || { x: g.x, y: g.y }, dx = g.x - from.x, dy = g.y - from.y, n = Math.max(Math.abs(dx), Math.abs(dy));
       for (let i = 1; i <= n; i++) {
         const x = Math.round(from.x + dx * i / n), y = Math.round(from.y + dy * i / n), d = curDef();
-        if (api.canPlace(d, x, y, g.rot).ok && eco.canAfford(d.cost)) api.place(d, x, y, g.rot);
+        if (api.canPlace(d, x, y, g.rot).ok && eco.canAfford(d.cost) && api.place(d, x, y, g.rot)) placedOne = true;
       }
       if (!n) tryPlace(true);
       lastXY = { x: g.x, y: g.y }; updateCards(); ghostKey = ''; updateGhost(true);
@@ -126,16 +151,16 @@ function onUp(e) {
   initAudio();
   if (e.pointerType === 'touch') {
     pointers.delete(e.pointerId);
-    if (gesture) { if (pointers.size < 2) gesture = null; gestureEnd = performance.now(); drag = null; placing = false; return; }
+    if (gesture) { if (pointers.size < 2) gesture = null; gestureEnd = performance.now(); drag = null; placing = false; placedOne = false; return; }
     if (performance.now() - gestureEnd < 250) { drag = null; return; }
-    if (e.type === 'pointercancel') { drag = null; placing = false; return; }
+    if (e.type === 'pointercancel') { drag = null; placing = false; placedOne = false; return; }
   }
   if (drag && e.button === drag.btn) {
     const d0 = drag; drag = null;
     if (!d0.moved && d0.touch) tap(e.clientX, e.clientY);
     else if (!d0.moved && e.button === 2) { if (UI.tool !== 'select') cancelBuild(); else clearSelection(); }
   }
-  if (e.button === 0) placing = false;
+  if (e.button === 0) { placing = false; afterPlace(); }
 }
 // кнопки тач-панели размещения
 export function confirmPlace() { updateGhost(true); tryPlace(false); }
@@ -209,11 +234,18 @@ function tryPlace(quiet) {
     const home = homeOf();
     if (!g.valid) { if (!quiet) { toast(g.reason || 'Не хватает материалов', 'warn'); sfx('no'); } return; }
     placeFurn(home, d, g.x, g.y, g.rot, g.wall); updateCards(); ghostKey = ''; updateGhost(true);
+    placedOne = true; afterPlace();
     return;
   }
   if (!g.valid) { if (!quiet) { const chk = api.canPlace(d, g.x, g.y, g.rot); if (!chk.ok) toast(chk.reason, 'warn'); else if (!api.unlocked(d)) toast(api.lockReason(d), 'warn'); else toast('Не хватает материалов', 'warn'); sfx('no'); } return; }
   const r = api.place(d, g.x, g.y, g.rot);
-  if (r) { updateCards(); ghostKey = ''; updateGhost(true); }
+  if (r) { updateCards(); ghostKey = ''; updateGhost(true); placedOne = true; afterPlace(); }
+}
+// после постройки выходим из режима (при перетаскивании дорожек и заборов — когда отпустили кнопку); Shift — продолжать
+function afterPlace() {
+  if (placing || !placedOne) return;
+  placedOne = false;
+  if (!keepBuild && UI.tool === 'build') cancelBuild();
 }
 
 // ---------------------------------------------------------------- выбор объектов
@@ -224,9 +256,10 @@ function pickWorld(mx, my) {
     const [wx, wy] = screenToWorld(mx, my, z), tx = Math.floor(wx), ty = Math.floor(wy);
     if (!inB(tx, ty)) continue;
     const b = bldAt(tx, ty);
-    if (b) { const def = BDEF[b.t]; if ((!def.flat || z === 0) && def.h + 12 >= z) return { kind: 'bld', b }; }
+    if (b) { const def = BDEF[b.t]; if ((!def.flat || z === 0) && (def.ph ?? def.h) + 12 >= z) return { kind: 'bld', b }; }
     const n = nodeAt(tx, ty);
-    if (n && NDEF[n.t].h + 8 >= z && (z === 0 || NDEF[n.t].h > 30)) return { kind: 'node', n };
+    const nh = n && (NDEF[n.t].ph ?? NDEF[n.t].h);   // ph — высота для наведения: у низких растений h больше, чем они выглядят
+    if (n && nh + 8 >= z && (z === 0 || nh > 30)) return { kind: 'node', n };
   }
   return null;
 }

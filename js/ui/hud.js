@@ -8,7 +8,7 @@ import { cozyLevel } from '../game/cozy.js';
 import { nextGoals } from '../game/goals.js';
 import { UI } from './state.js';
 import { toast } from './ui.js';
-import { openInventory, openCraft, openJournal, openMenu } from './modals.js';
+import { openInventory, openCraft, openJournal, openMenu, openNeeds } from './modals.js';
 import { takePhoto, confirmPlace, rotateGhost, centerPlayer } from '../input.js';
 import { R } from '../render/scene.js';
 import { cancelBuild } from './buildbar.js';
@@ -26,8 +26,8 @@ export function buildHUD() {
     h('div', { id: 'topbar' },
       h('div', { class: 'tb-time' }, h('span', { id: 'tb-season' }), h('span', { id: 'tb-day' }), h('span', { id: 'tb-clock' }), h('span', { id: 'tb-wx' })),
       h('div', { class: 'speed' }, ...[['⏸', 0], ['▶', 1], ['⏩', 2], ['⏭', 4]].map(([ic, v]) => h('button', { 'data-sp': v, title: ['Пауза (P)', 'Обычная скорость (1)', 'Быстро (2)', 'Очень быстро (3)'][[0, 1, 2, 4].indexOf(v)], onclick: () => setSpeed(v) }, ic)))),
-    h('div', { id: 'needs' }, ...NEEDS.map(([k, ic, name, col]) => h('div', { class: 'need', 'data-k': k, title: name }, h('span', { class: 'ic' }, ic), h('div', { class: 'bar' }, h('i', { style: `background:${col}` }))))),
-    h('div', { id: 'cozybox' }, h('div', { class: 'cz-top' }, h('span', null, '🧸 Уют '), h('b', { id: 'cz-n' })), h('div', { class: 'cz-name', id: 'cz-name' }), h('div', { class: 'bar' }, h('i', { id: 'cz-bar' }))),
+    h('div', { id: 'needs', title: 'Нажми, чтобы узнать подробнее', onclick: () => openNeeds() }, ...NEEDS.map(([k, ic, name, col]) => h('div', { class: 'need', 'data-k': k, title: name }, h('span', { class: 'ic' }, ic), h('div', { class: 'bar' }, h('i', { style: `background:${col}` }))))),
+    h('div', { id: 'cozybox', title: 'Нажми, чтобы узнать про уют', onclick: () => openJournal('cozy') }, h('div', { class: 'cz-top' }, h('span', null, '🧸 Уют '), h('b', { id: 'cz-n' })), h('div', { class: 'cz-name', id: 'cz-name' }), h('div', { class: 'bar' }, h('i', { id: 'cz-bar' }))),
     h('div', { id: 'goalhint' }),
     h('div', { id: 'interior-banner' }),
     h('div', { id: 'sleepmsg' }, '😴 Спишь… нажми, чтобы проснуться'),
@@ -41,11 +41,11 @@ export function buildHUD() {
       h('button', { title: 'К персонажу (Пробел)', onclick: centerPlayer }, '🎯'),
       h('button', { title: 'Рюкзак (I)', onclick: openInventory }, '🎒'),
       h('button', { title: 'Ручная работа (C)', onclick: openCraft }, '✋'),
-      h('button', { title: 'Журнал и уют (J)', onclick: openJournal }, '📖'),
+      h('button', { title: 'Журнал: цели, уют, рецепты (J)', onclick: () => openJournal('goals') }, '📖'),
       h('button', { title: 'Сфотографировать (F)', onclick: takePhoto }, '📷'),
       h('button', { id: 'mute-btn', title: 'Звук (M)', onclick: () => { initAudio(); setMuted(!isMuted()); syncMute(); } }, '🔊'),
       h('button', { title: 'Меню (Esc)', onclick: openMenu }, '⚙️')),
-    h('div', { id: 'resbar' }),
+    h('div', { id: 'resbar', title: 'Рюкзак (I)', onclick: () => openInventory() }),
   );
   els = { season: $('#tb-season'), day: $('#tb-day'), clock: $('#tb-clock'), wx: $('#tb-wx'), res: $('#resbar'), hint: $('#goalhint'), czn: $('#cz-n'), czname: $('#cz-name'), czbar: $('#cz-bar'), banner: $('#interior-banner'), sleep: $('#sleepmsg') };
   $('#sleepmsg').addEventListener('pointerdown', () => wakeUp());
@@ -73,7 +73,7 @@ export function updateHUD(dt) {
   if (sig !== els.resSig) { els.resSig = sig; els.res.replaceChildren(...chips); }
   const g = nextGoals(2);
   const hs = g.map((x) => x.id).join();
-  if (hs !== els.hintSig) { els.hintSig = hs; els.hint.replaceChildren(...g.map((x) => h('div', { class: 'gh', title: x.desc, onclick: openJournal }, h('span', null, x.ic), h('div', null, h('b', null, x.name), h('small', null, x.desc))))); els.hint.style.display = g.length ? 'flex' : 'none'; }
+  if (hs !== els.hintSig) { els.hintSig = hs; els.hint.replaceChildren(...g.map((x) => h('div', { class: 'gh', title: x.desc, onclick: () => openJournal('goals', x.id) }, h('span', null, x.ic), h('div', null, h('b', null, x.name), h('small', null, x.desc))))); els.hint.style.display = g.length ? 'flex' : 'none'; }
   // интерьер
   const home = homeOf();
   if (home) { const bsig = bldName(home) + G.cozy.total; if (els.bsig !== bsig) { els.bsig = bsig; els.banner.replaceChildren(h('span', null, '🏠 Внутри: ' + bldName(home)), h('button', { title: 'Поспать прямо на полу — без кровати хуже', onclick: () => { if (G.needs.energy > 92) toast('Совсем не хочется спать'); else startSleep('floor', 0.7); } }, '💤 Прилечь'), h('button', { onclick: exitHome }, '↩ Выйти из дома')); } els.banner.style.display = 'flex'; }
