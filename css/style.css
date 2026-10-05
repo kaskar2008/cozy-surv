@@ -153,5 +153,8 @@ body.touch #menu-btns button { padding: 8px 11px; }
   .toast { font-size: 13px; max-width: 92vw; } #toasts { top: 150px; }
 }
 
-.bb-handle { position: absolute; top: -33px; right: 18px; padding: 3px 22px 2px; min-height: 0 !important; font-size: 18px; line-height: 1.2; border-radius: 14px 14px 0 0; background: var(--paper); border-bottom: 0; box-shadow: 0 -3px 10px rgba(60, 35, 15, .14); }
-body.touch .bb-handle { padding: 6px 28px 4px; top: -38px; }
+.bb-handle { position: absolute; top: -27px; left: 50%; transform: translateX(-50%); width: 92px; height: 27px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 15px 15px 0 0; background: var(--paper); border: 1px solid var(--line); border-bottom: 0; box-shadow: 0 -4px 12px rgba(60, 35, 15, .14); touch-action: none; }
+.bb-handle i { width: 11px; height: 11px; border-right: 3px solid var(--ink2); border-bottom: 3px solid var(--ink2); border-radius: 2px; transform: translateY(-3px) rotate(45deg); transition: transform .25s; }
+#buildbar.closed .bb-handle i { transform: translateY(3px) rotate(-135deg); }
+.bb-handle:hover i { border-color: var(--accent); }
+body.touch .bb-handle { width: 120px; height: 34px; top: -34px; }

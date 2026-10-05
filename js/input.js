@@ -258,6 +258,8 @@ function clickInterior(mx, my, dbl) {
   const home = homeOf(); if (!home) return;
   const r = pickInterior(home, mx, my);
   if (r?.it) { selectFurn(r.it); return; }
+  // ковры и спальник лежат на полу: спальник выбирается сразу, остальное — двойным нажатием (иначе по ним неудобно ходить)
+  if (r?.flat && (FDEF[r.flat.t].sleep || dbl)) { selectFurn(r.flat); return; }
   if (r?.tile) { clearSelection(); pl.goTo(r.tile[0], r.tile[1]); }
 }
 

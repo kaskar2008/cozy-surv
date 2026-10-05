@@ -16,7 +16,14 @@ let root, catRow, cardRow, handle, lastSig = '';
 export function buildBar() {
   root = $('#buildbar');
   catRow = h('div', { class: 'cats' }); cardRow = h('div', { class: 'cards' });
-  handle = h('button', { class: 'bb-handle', title: 'Свернуть / развернуть панель (B)', onclick: toggleBar }, '⌄');
+  handle = h('div', { class: 'bb-handle', role: 'button', 'aria-label': 'Свернуть / развернуть панель', title: 'Свернуть / развернуть панель (B)' }, h('i'));
+  let y0 = null;
+  handle.addEventListener('pointerdown', (e) => { y0 = e.clientY; handle.setPointerCapture?.(e.pointerId); });
+  handle.addEventListener('pointerup', (e) => {
+    if (y0 == null) return; const dy = e.clientY - y0; y0 = null;
+    if (Math.abs(dy) <= 18 || (dy > 18 && UI.buildOpen) || (dy < -18 && !UI.buildOpen)) toggleBar();
+  });
+  handle.addEventListener('pointercancel', () => { y0 = null; });
   root.append(handle, catRow, cardRow);
   root.addEventListener('wheel', (e) => { const row = catRow.contains(e.target) ? catRow : cardRow; const d = e.deltaX || e.deltaY; if (d) { row.scrollLeft += d; e.preventDefault(); } }, { passive: false });
   renderBar();
@@ -28,7 +35,7 @@ export function setTool(t) {
   renderBar(true);
 }
 export function cancelBuild() { if (UI.tool !== 'select') setTool('select'); }
-export function toggleBar() { UI.buildOpen = !UI.buildOpen; root.classList.toggle('closed', !UI.buildOpen); handle.textContent = UI.buildOpen ? '⌄' : '⌃'; }
+export function toggleBar() { UI.buildOpen = !UI.buildOpen; root.classList.toggle('closed', !UI.buildOpen); }
 
 export function renderBar(soft) {
   const ins = inside(), cats = ins ? FCATS : BCATS, cur = ins ? UI.fcat : UI.cat;
