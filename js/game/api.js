@@ -150,7 +150,7 @@ function terraform(def, x, y, b) {
     if ((G.tiles[k] === T.GRASS || G.tiles[k] === T.DIRT || G.tiles[k] === T.FOREST) && nearWater(tx, ty, 1)) G.tiles[k] = T.SAND;
     if (G.tiles[k] === T.WATER && G.shd[k] !== 7) G.shd[k] = 7;
   }
-  G.dirtyBlk = true;
+  G.dirtyBlk = true; G.terrainVer = (G.terrainVer || 0) + 1;
 }
 export function refundOf(b) {
   const def = BDEF[b.t]; let cost = { ...def.cost };

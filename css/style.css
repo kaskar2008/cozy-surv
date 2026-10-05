@@ -1,5 +1,5 @@
 :root {
-  --paper: rgba(255, 248, 234, .94); --paper2: #fff3dc; --ink: #4a3426; --ink2: #7a5c46; --line: rgba(120, 80, 40, .22);
+  --paper: rgba(255, 248, 234, .97); --paper2: #fff3dc; --ink: #4a3426; --ink2: #7a5c46; --line: rgba(120, 80, 40, .22);
   --accent: #e28a4a; --accent2: #f2b36a; --green: #6aa655; --red: #d4574a; --shadow: 0 6px 22px rgba(60, 35, 15, .28);
   --font: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
@@ -25,7 +25,7 @@ small { color: var(--ink2); font-size: 12px; }
 
 /* верхняя панель */
 #topbar { position: absolute; top: 10px; left: 10px; display: flex; gap: 8px; align-items: center; }
-.tb-time, .speed, #needs, #cozybox, #resbar, #menu-btns, #goalhint .gh, #interior-banner, #panel, #buildbar, .toast { background: var(--paper); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(6px); }
+.tb-time, .speed, #needs, #cozybox, #resbar, #menu-btns, #goalhint .gh, #interior-banner, #panel, #buildbar, .toast { background: var(--paper); border: 1px solid var(--line); box-shadow: var(--shadow); }
 .tb-time { display: flex; gap: 10px; padding: 7px 14px; border-radius: 16px; font-weight: 700; font-size: 15px; align-items: center; }
 .tb-time #tb-clock { font-variant-numeric: tabular-nums; color: var(--accent); }
 .speed { display: flex; border-radius: 14px; overflow: hidden; }
@@ -102,7 +102,7 @@ small { color: var(--ink2); font-size: 12px; }
 #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .16s; z-index: 80; } #flash.on { opacity: .85; transition: none; }
 
 /* окна */
-.modal-wrap { position: fixed; inset: 0; background: rgba(40, 24, 12, .38); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 60; animation: fade .15s; }
+.modal-wrap { position: fixed; inset: 0; background: rgba(40, 24, 12, .45); display: flex; align-items: center; justify-content: center; z-index: 60; animation: fade .15s; }
 @keyframes fade { from { opacity: 0; } }
 .modal { background: var(--paper); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 12px 50px rgba(40, 20, 5, .4); width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 40px); display: flex; flex-direction: column; animation: pop .2s cubic-bezier(.3, 1.4, .5, 1); }
 .modal.wide { width: min(820px, calc(100vw - 24px)); } .modal.narrow { width: min(440px, calc(100vw - 24px)); }

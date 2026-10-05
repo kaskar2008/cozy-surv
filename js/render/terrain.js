@@ -52,48 +52,72 @@ function detail(t, season, k) {
   return cv;
 }
 
+// ---- кэш земли по чанкам 8×8 клеток: рисуется один раз на сезон/масштаб, затем drawImage ----
+const CH = 8;
+let chunks = new Map(), cTiles = null, cSeason = -1, cTier = 0, cVer = -1, sparkles = null;
 const buckets = Array.from({ length: 30 }, () => []);
-export function drawTerrain(c, view, season, t) {
-  if (palSeason !== season) { buildColors(season); detCache.clear(); }
+
+function renderChunk(cx, cy, S) {
+  const x0 = cx * CH, y0 = cy * CH;
+  const ox = (x0 - y0 - CH) * HW - 3, oy = (x0 + y0) * HH - 3, w = 2 * CH * HW + 6, h = 2 * CH * HH + 6;
+  const cv = document.createElement('canvas'); cv.width = Math.ceil(w * S); cv.height = Math.ceil(h * S);
+  const c = cv.getContext('2d');
+  c.setTransform(S, 0, 0, S, -ox * S, -oy * S);
   for (const b of buckets) b.length = 0;
-  const x0 = Math.max(-8, view.x0), y0 = Math.max(-8, view.y0), x1 = Math.min(N + 8, view.x1), y1 = Math.min(N + 8, view.y1);
-  const water = [];
-  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+  for (let y = y0; y < y0 + CH; y++) for (let x = x0; x < x0 + CH; x++) {
     let tt = T.WATER, lv = 0;
-    if (inB(x, y)) {
-      const i = y * N + x; tt = G.tiles[i];
-      lv = tt === T.WATER ? (G.shd[i] === 7 ? 4 : G.shd[i] % 3) : G.shd[i] % 5;
-    }
+    if (inB(x, y)) { const i = y * N + x; tt = G.tiles[i]; lv = tt === T.WATER ? (G.shd[i] === 7 ? 4 : G.shd[i] % 3) : G.shd[i] % 5; }
     buckets[tt * 5 + lv].push(x, y);
-    if (tt === T.WATER) water.push(x, y);
   }
   for (let k = 0; k < 30; k++) {
     const arr = buckets[k]; if (!arr.length) continue;
-    c.fillStyle = colors[(k / 5) | 0][k % 5];
-    c.beginPath();
+    c.fillStyle = colors[(k / 5) | 0][k % 5]; c.beginPath();
     for (let i = 0; i < arr.length; i += 2) {
       const X = (arr[i] - arr[i + 1]) * HW, Y = (arr[i] + arr[i + 1]) * HH;
       c.moveTo(X, Y - 0.6); c.lineTo(X + HW + 0.8, Y + HH); c.lineTo(X, Y + 2 * HH + 0.6); c.lineTo(X - HW - 0.8, Y + HH); c.closePath();
     }
     c.fill();
   }
-  // детали
-  for (let y = Math.max(0, y0); y < Math.min(N, y1); y++) for (let x = Math.max(0, x0); x < Math.min(N, x1); x++) {
-    const i = y * N + x, d = G.det[i];
-    if (!d) continue;
+  for (let y = Math.max(0, y0); y < Math.min(N, y0 + CH); y++) for (let x = Math.max(0, x0); x < Math.min(N, x0 + CH); x++) {
+    const i = y * N + x, d = G.det[i]; if (!d) continue;
     const tt = G.tiles[i]; if (tt === T.WATER) continue;
-    if (G.nAt[i] || G.bAt[i]) continue;
-    c.drawImage(detail(tt, season, d), (x - y) * HW - 20, (x + y) * HH + HH - 16);
+    c.drawImage(detail(tt, palSeason, d), (x - y) * HW - 20, (x + y) * HH + HH - 16);
+  }
+  return { cv, ox, oy, w, h };
+}
+function ensureCache(season, tier) {
+  if (palSeason !== season) { buildColors(season); detCache.clear(); }
+  if (cTiles !== G.tiles || cSeason !== season || cTier !== tier || cVer !== G.terrainVer) {
+    chunks.clear(); cTiles = G.tiles; cSeason = season; cTier = tier; cVer = G.terrainVer; sparkles = null;
+  }
+}
+function buildSparkles() {
+  sparkles = [];
+  for (let y = -8; y < N + 8; y++) for (let x = -8; x < N + 8; x++) {
+    if (inB(x, y) && G.tiles[y * N + x] !== T.WATER) continue;
+    const h = hash2(x, y, 5); if (h > 0.45) continue;
+    sparkles.push({ x: (x - y) * HW + (h - 0.2) * 24, y: (x + y) * HH + HH + (h * 7 % 6) - 3, ph: h * 40, tx: x, ty: y });
+  }
+}
+const LV = [0.1, 0.18, 0.26, 0.34];
+export function drawTerrain(c, view, season, t, scale = 2) {
+  const tier = cTier === 2 ? (scale < 2.1 ? 1 : 2) : (scale > 2.6 ? 2 : 1), S = tier === 2 ? 3.5 : 2;   // гистерезис, чтобы кэш не перестраивался туда-сюда
+  ensureCache(season, tier);
+  const cx0 = Math.floor(Math.max(-8, view.x0) / CH), cx1 = Math.floor((Math.min(N + 8, view.x1) - 1) / CH);
+  const cy0 = Math.floor(Math.max(-8, view.y0) / CH), cy1 = Math.floor((Math.min(N + 8, view.y1) - 1) / CH);
+  for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
+    const key = cx + ',' + cy; let ch = chunks.get(key);
+    if (!ch) { ch = renderChunk(cx, cy, S); chunks.set(key, ch); if (chunks.size > (tier === 2 ? 16 : 40)) chunks.delete(chunks.keys().next().value); }
+    c.drawImage(ch.cv, ch.ox, ch.oy, ch.w, ch.h);
   }
   // блики воды
-  c.lineCap = 'round';
-  for (let i = 0; i < water.length; i += 2) {
-    const x = water[i], y = water[i + 1], h = hash2(x, y, 5);
-    if (h > 0.45) continue;
-    const ph = Math.sin(t * 1.3 + h * 40), a = 0.18 + 0.2 * ph;
-    if (a < 0.05) continue;
-    const X = (x - y) * HW + (h - 0.2) * 24, Y = (x + y) * HH + HH + (h * 7 % 6) - 3;
-    c.strokeStyle = `rgba(255,255,255,${a})`; c.lineWidth = 1.6;
-    c.beginPath(); c.moveTo(X - 7, Y); c.lineTo(X + 6 + ph * 3, Y); c.stroke();
+  if (!sparkles) buildSparkles();
+  c.lineCap = 'round'; c.lineWidth = 1.6;
+  const paths = [new Path2D(), new Path2D(), new Path2D(), new Path2D()]; let any = false;
+  for (const s of sparkles) {
+    if (s.tx < view.x0 || s.tx > view.x1 || s.ty < view.y0 || s.ty > view.y1) continue;
+    const a = 0.18 + 0.2 * Math.sin(t * 1.3 + s.ph); if (a < 0.1) continue;
+    const q = Math.min(3, Math.floor((a - 0.1) / 0.075)); paths[q].moveTo(s.x - 7, s.y); paths[q].lineTo(s.x + 6, s.y); any = true;
   }
+  if (any) for (let q = 0; q < 4; q++) { c.strokeStyle = `rgba(255,255,255,${LV[q]})`; c.stroke(paths[q]); }
 }

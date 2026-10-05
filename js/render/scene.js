@@ -13,6 +13,7 @@ import { drawParts, drawAmbient } from './fx.js';
 import { drawLighting } from './lighting.js';
 import { drawWeather } from './weather.js';
 import { isHot } from '../game/nets.js';
+import { mark, now as pnow } from '../core/prof.js';
 
 // Состояние отрисовки, которое задают ввод и UI
 export const R = { hover: null, ghost: null, sel: null, links: [], grid: false, time: 0 };
@@ -55,7 +56,8 @@ export function renderWorld(ctx, t, dt) {
   ctx.fillStyle = WATER_BG; ctx.fillRect(0, 0, cam.W * dpr, cam.H * dpr);
   ctx.setTransform(dpr * cam.zoom, 0, 0, dpr * cam.zoom, dpr * (cam.W / 2 - cam.x * cam.zoom), dpr * (cam.H / 2 - cam.y * cam.zoom));
   const view = viewTiles(3);
-  drawTerrain(ctx, view, season_, t);
+  let p0 = pnow();
+  drawTerrain(ctx, view, season_, t, dpr * cam.zoom); p0 = mark('r.terrain', p0);
   const flats = [], items = [], lights = [];
   for (const b of G.bMap.values()) {
     if (b.x > view.x1 || b.y > view.y1 || b.x + b.w < view.x0 || b.y + b.d < view.y0) continue;
@@ -75,6 +77,7 @@ export function renderWorld(ctx, t, dt) {
   items.push({ k: pl.x + pl.y + (G.scene === 'world' ? 0 : -999), player: true });
   for (const p of G.pets) if (!p.in) items.push({ k: p.x + p.y, pet: p });
   if (G.npc) items.push({ k: G.npc.x + G.npc.y, npc: G.npc });
+  p0 = mark('r.collect', p0);
   items.sort((a, b) => a.k - b.k);
   for (const it of items) {
     if (it.b) drawBld(ctx, it.b, it.def, o, t);
@@ -83,15 +86,16 @@ export function renderWorld(ctx, t, dt) {
     else if (it.pet) drawPet(ctx, it.pet, t);
     else if (it.npc) drawTraveler(ctx, it.npc, t);
   }
+  p0 = mark('r.items', p0);
   drawOverlays(ctx, o, t);
   drawAmbient(ctx, t);
-  drawParts(ctx);
+  drawParts(ctx); p0 = mark('r.overlays', p0);
   // свет игрока ночью
   if (G.scene === 'world') lights.push({ x: pl.x, y: pl.y, z: 20, r: 2.0, col: '#ffe0a8', a: .35 });
   for (const p of G.pets) if (p.sleep === false) lights.push({ x: p.x, y: p.y, z: 8, r: .8, col: '#ffe0a8', a: .1 });
   const extra = G.weather.type === 'rain' ? .14 : G.weather.type === 'cloudy' ? .05 : G.weather.type === 'snow' ? .02 : 0;
-  drawLighting(ctx, lights, t, { extraDark: (dk > .02 ? extra : extra * .6) * (G.wx ? 1 : 0), toScreen: worldToScreen });
-  drawWeather(ctx, t, dt);
+  drawLighting(ctx, lights, t, { extraDark: (dk > .02 ? extra : extra * .6) * (G.wx ? 1 : 0), toScreen: worldToScreen }); p0 = mark('r.light', p0);
+  drawWeather(ctx, t, dt); mark('r.weather', p0);
 }
 
 function drawGrid(c, g) {

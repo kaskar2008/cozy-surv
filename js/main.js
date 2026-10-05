@@ -20,25 +20,40 @@ import { openIntro } from './ui/modals.js';
 import { initInput, updateInput } from './input.js';
 import { UI } from './ui/state.js';
 import * as api from './game/api.js';
+import { prof, mark, now, hooks } from './core/prof.js';
 
 const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+let quality = 1;
 function resize() {
-  cam.dpr = Math.min(2, window.devicePixelRatio || 1); cam.W = innerWidth; cam.H = innerHeight;
+  cam.dpr = Math.min(2, window.devicePixelRatio || 1) * quality; cam.W = innerWidth; cam.H = innerHeight;
   canvas.width = Math.floor(cam.W * cam.dpr); canvas.height = Math.floor(cam.H * cam.dpr);
   canvas.style.width = cam.W + 'px'; canvas.style.height = cam.H + 'px';
 }
 addEventListener('resize', resize); resize();
 
 let last = performance.now(), time = 0, audioT = 0, cardT = 0;
+let ivEma = 16.7, lowT = 0, highT = 0, lastDown = -1e9;
 function frame(ts) {
-  const dt = Math.min(0.1, (ts - last) / 1000); last = ts; time += dt;
+  const el = ts - last;
+  if (el < 12) { requestAnimationFrame(frame); return; }      // не больше ~60 кадров/с на 120–144 Гц экранах
+  const dt = Math.min(0.1, el / 1000); last = ts; time += dt;
+  // адаптивное разрешение: если кадры дольше ~24 мс — снижаем плотность пикселей, при запасе возвращаем
+  if (el < 250) {
+    ivEma = ivEma * 0.95 + el * 0.05;
+    if (ivEma > 24) { lowT += el; highT = 0; } else if (ivEma < 18) { highT += el; lowT = 0; } else { lowT = highT = 0; }
+    if (lowT > 1500 && quality > 0.55) { quality = Math.max(0.55, quality - 0.15); lowT = 0; lastDown = ts; resize(); ivEma = 16.7; }
+    else if (highT > 12000 && quality < 1 && ts - lastDown > 40000) { quality = Math.min(1, quality + 0.15); highT = 0; resize(); }
+  }
   try {
-    updateInput(dt);
-    simulate(dt);
+    let t0 = now();
+    updateInput(dt); t0 = mark('input', t0);
+    simulate(dt); t0 = mark('sim', t0);
     fx.update(dt);
     if (G.scene === 'world') fx.ambient(dt * (G.speed ? 1 : .2), time, G.weather.type);
+    t0 = mark('fx', t0);
     if (G.scene === 'world') renderWorld(ctx, time, dt); else renderInterior(ctx, time, dt);
-    updateHUD(dt); updatePanel(dt);
+    t0 = mark('render', t0);
+    updateHUD(dt); updatePanel(dt); t0 = mark('ui', t0);
     cardT -= dt; if (cardT <= 0) { cardT = .5; updateCards(); }
     audioT -= dt;
     if (audioT <= 0) {
@@ -65,7 +80,7 @@ function boot() {
   S.hooks.newGame = () => { wipe(); newGame(); ensureLinks(); computeCozy(); centerOn(G.player.x, G.player.y); clearSelection(); UI.tool = 'select'; UI.def = null; UI.fdef = null; renderBar(); setSpeed(1); save(); };
   S.hooks.onSceneChange = () => { clearSelection(); UI.tool = 'select'; UI.def = null; UI.fdef = null; R.ghost = null; renderBar(); };
   if (fresh) { setSpeed(0); openIntro(() => { setSpeed(1); save(); }); }
-  window.cozy = { G, S, api, BDEF, cam, R, UI, save, load };
+  window.cozy = { quality: () => quality, G, S, api, BDEF, cam, R, UI, save, load, prof, syncProf: (on) => { hooks.sync = on ? () => ctx.getImageData(0, 0, 1, 1) : null; } };
   requestAnimationFrame(frame);
 }
 boot();
