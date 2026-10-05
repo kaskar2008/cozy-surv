@@ -1,0 +1,17 @@
+{
+  "name": "cozy-island",
+  "version": "0.1.0",
+  "description": "Уютная изометрическая игра про обустройство шелтера. Без зомби, без паники.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "vite",
+    "deploy": "npm run build && firebase deploy --only hosting"
+  },
+  "devDependencies": {
+    "vite": "^8.3.2"
+  },
+  "private": true
+}
