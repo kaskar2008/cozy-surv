@@ -3,6 +3,7 @@ import { G, N } from '../game/state.js';
 import { T, inB } from '../game/world.js';
 import { HW, HH } from '../core/iso.js';
 import { shade, hash2 } from '../core/util.js';
+import { cam } from './camera.js';
 
 const PAL = {
   [T.GRASS]: ['#93cc62', '#80bd55', '#b0b04e', '#e6eff2'],
@@ -52,21 +53,32 @@ function detail(t, season, k) {
   return cv;
 }
 
-// ---- кэш земли по чанкам 8×8 клеток: рисуется один раз на сезон/масштаб, затем drawImage ----
-const CH = 8;
-let chunks = new Map(), cTiles = null, cSeason = -1, cTier = 0, cVer = -1, sparkles = null;
+// ---- кэш земли: экранно-выровненные непрозрачные блоки 512×512 «мирового» изображения ----
+// (без прозрачных углов — нет лишней перерисовки; блоки на лету рисуются один раз на сезон/масштаб)
+const B = 512, PAD = 2;
+let chunks = new Map(), cTiles = null, cSeason = -1, cTier = -1, cVer = -1, sparkles = null;
 const buckets = Array.from({ length: 30 }, () => []);
+const MAP_U0 = (-8 - (N + 8)) * HW - HW, MAP_U1 = ((N + 8) + 8) * HW + HW, MAP_V0 = -16 * HH, MAP_V1 = (2 * N + 16) * HH + 2 * HH;
 
-function renderChunk(cx, cy, S) {
-  const x0 = cx * CH, y0 = cy * CH;
-  const ox = (x0 - y0 - CH) * HW - 3, oy = (x0 + y0) * HH - 3, w = 2 * CH * HW + 6, h = 2 * CH * HH + 6;
-  const cv = document.createElement('canvas'); cv.width = Math.ceil(w * S); cv.height = Math.ceil(h * S);
+function renderBlock(bx, by, S) {
+  const ox = bx * B, oy = by * B, sz = B + PAD;
+  const cv = document.createElement('canvas'); cv.width = Math.ceil(sz * S); cv.height = Math.ceil(sz * S);
   const c = cv.getContext('2d');
   c.setTransform(S, 0, 0, S, -ox * S, -oy * S);
+  c.fillStyle = WATER_BG; c.fillRect(ox, oy, sz, sz);
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (const [u, v] of [[ox - HW, oy - 2 * HH], [ox + sz + HW, oy - 2 * HH], [ox - HW, oy + sz], [ox + sz + HW, oy + sz]]) {
+    const x = (u / HW + v / HH) / 2, y = (v / HH - u / HW) / 2;
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  x0 = Math.max(-8, Math.floor(x0) - 1); y0 = Math.max(-8, Math.floor(y0) - 1); x1 = Math.min(N + 8, Math.ceil(x1) + 1); y1 = Math.min(N + 8, Math.ceil(y1) + 1);
   for (const b of buckets) b.length = 0;
-  for (let y = y0; y < y0 + CH; y++) for (let x = x0; x < x0 + CH; x++) {
+  const mine = [];
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    const X = (x - y) * HW, Y = (x + y) * HH;
+    if (X + HW < ox || X - HW > ox + sz || Y + 2 * HH < oy || Y > oy + sz) continue;
     let tt = T.WATER, lv = 0;
-    if (inB(x, y)) { const i = y * N + x; tt = G.tiles[i]; lv = tt === T.WATER ? (G.shd[i] === 7 ? 4 : G.shd[i] % 3) : G.shd[i] % 5; }
+    if (inB(x, y)) { const i = y * N + x; tt = G.tiles[i]; lv = tt === T.WATER ? (G.shd[i] === 7 ? 4 : G.shd[i] % 3) : G.shd[i] % 5; mine.push(i, x, y); }
     buckets[tt * 5 + lv].push(x, y);
   }
   for (let k = 0; k < 30; k++) {
@@ -78,12 +90,13 @@ function renderChunk(cx, cy, S) {
     }
     c.fill();
   }
-  for (let y = Math.max(0, y0); y < Math.min(N, y0 + CH); y++) for (let x = Math.max(0, x0); x < Math.min(N, x0 + CH); x++) {
-    const i = y * N + x, d = G.det[i]; if (!d) continue;
+  for (let m = 0; m < mine.length; m += 3) {
+    const i = mine[m], d = G.det[i]; if (!d) continue;
     const tt = G.tiles[i]; if (tt === T.WATER) continue;
+    const x = mine[m + 1], y = mine[m + 2];
     c.drawImage(detail(tt, palSeason, d), (x - y) * HW - 20, (x + y) * HH + HH - 16);
   }
-  return { cv, ox, oy, w, h };
+  return { cv, ox, oy, sz };
 }
 function ensureCache(season, tier) {
   if (palSeason !== season) { buildColors(season); detCache.clear(); }
@@ -101,15 +114,23 @@ function buildSparkles() {
 }
 const LV = [0.1, 0.18, 0.26, 0.34];
 export function drawTerrain(c, view, season, t, scale = 2) {
-  const tier = cTier === 2 ? (scale < 2.1 ? 1 : 2) : (scale > 2.6 ? 2 : 1), S = tier === 2 ? 3.5 : 2;   // гистерезис, чтобы кэш не перестраивался туда-сюда
+  // три уровня детализации кэша (с гистерезисом): издали — мелкие блоки, вблизи — крупные
+  let tier = cTier < 0 ? (scale < 1.3 ? 0 : scale > 2.6 ? 2 : 1) : cTier;
+  if (tier === 0 && scale > 1.45) tier = 1; else if (tier === 1 && scale < 1.15) tier = 0; else if (tier === 1 && scale > 2.6) tier = 2; else if (tier === 2 && scale < 2.1) tier = 1;
+  const S = [1.25, 2, 3.5][tier];
   ensureCache(season, tier);
-  const cx0 = Math.floor(Math.max(-8, view.x0) / CH), cx1 = Math.floor((Math.min(N + 8, view.x1) - 1) / CH);
-  const cy0 = Math.floor(Math.max(-8, view.y0) / CH), cy1 = Math.floor((Math.min(N + 8, view.y1) - 1) / CH);
-  for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
-    const key = cx + ',' + cy; let ch = chunks.get(key);
-    if (!ch) { ch = renderChunk(cx, cy, S); chunks.set(key, ch); if (chunks.size > (tier === 2 ? 16 : 40)) chunks.delete(chunks.keys().next().value); }
-    c.drawImage(ch.cv, ch.ox, ch.oy, ch.w, ch.h);
+  const hw = cam.W / 2 / cam.zoom, hh = cam.H / 2 / cam.zoom;
+  const bx0 = Math.floor((cam.x - hw - PAD) / B), bx1 = Math.floor((cam.x + hw) / B), by0 = Math.floor((cam.y - hh - PAD) / B), by1 = Math.floor((cam.y + hh) / B);
+  let vis = 0;
+  for (let by = by0; by <= by1; by++) for (let bx = bx0; bx <= bx1; bx++) {
+    if (bx * B > MAP_U1 || (bx + 1) * B < MAP_U0 || by * B > MAP_V1 || (by + 1) * B < MAP_V0) continue;
+    const key = bx + ',' + by; let ch = chunks.get(key);
+    if (!ch) ch = renderBlock(bx, by, S); else chunks.delete(key);
+    chunks.set(key, ch); vis++;
+    c.drawImage(ch.cv, ch.ox, ch.oy, ch.sz, ch.sz);
   }
+  const cap = Math.max([60, 40, 16][tier], vis + 6);
+  while (chunks.size > cap) chunks.delete(chunks.keys().next().value);
   // блики воды
   if (!sparkles) buildSparkles();
   c.lineCap = 'round'; c.lineWidth = 1.6;
