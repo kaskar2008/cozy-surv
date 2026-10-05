@@ -56,7 +56,7 @@ reg([
   },
   {
     id: 'pipe', name: 'Труба', cat: 'water', icon: '➰', cost: { reeds: 2 }, req: ['tank'], flat: true, walk: true, drag: true, norot: true, h: 8,
-    desc: 'Тростниковая труба: соединяет баки, колодец, душ, грядки и всё, что работает с водой. Тяни мышью для прокладки.',
+    desc: 'Тростниковая труба: соединяет баки, колодец, душ, грядки и всё, что работает с водой. Протяни, чтобы проложить.',
     tags: ['conduit'], net: { water: { cap: 0 } }, conduit: 'water', key: (b) => b.mask || 0,
     draw(c, b) { conduit(c, b, '#a3b894', .13, '#7f9672'); },
   },

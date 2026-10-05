@@ -12,11 +12,12 @@ import { showTip, hideTip, toast } from './ui.js';
 import { R } from '../render/scene.js';
 import { sfx } from '../core/audio.js';
 
-let root, catRow, cardRow, lastSig = '';
+let root, catRow, cardRow, handle, lastSig = '';
 export function buildBar() {
   root = $('#buildbar');
   catRow = h('div', { class: 'cats' }); cardRow = h('div', { class: 'cards' });
-  root.append(catRow, cardRow);
+  handle = h('button', { class: 'bb-handle', title: 'Свернуть / развернуть панель (B)', onclick: toggleBar }, '⌄');
+  root.append(handle, catRow, cardRow);
   root.addEventListener('wheel', (e) => { if (e.deltaY) { cardRow.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
   renderBar();
 }
@@ -27,15 +28,15 @@ export function setTool(t) {
   renderBar(true);
 }
 export function cancelBuild() { if (UI.tool !== 'select') setTool('select'); }
-export function toggleBar() { UI.buildOpen = !UI.buildOpen; root.classList.toggle('closed', !UI.buildOpen); }
+export function toggleBar() { UI.buildOpen = !UI.buildOpen; root.classList.toggle('closed', !UI.buildOpen); handle.textContent = UI.buildOpen ? '⌄' : '⌃'; }
 
 export function renderBar(soft) {
   const ins = inside(), cats = ins ? FCATS : BCATS, cur = ins ? UI.fcat : UI.cat;
-  catRow.replaceChildren(
+  catRow.replaceChildren(...[
     h('button', { class: 'cat tool' + (UI.tool === 'select' ? ' on' : ''), title: 'Обычный режим (Esc)', onclick: () => setTool('select') }, '🖐', h('span', null, 'Курсор')),
-    ...cats.map((c) => h('button', { class: 'cat' + (c.id === cur && UI.tool !== 'demolish' ? ' on' : ''), onclick: () => { if (ins) UI.fcat = c.id; else UI.cat = c.id; if (UI.tool === 'demolish') UI.tool = 'select'; renderBar(); sfx('ui'); } }, c.icon, h('span', null, c.name))),
+    ...cats.map((c) => h('button', { class: 'cat' + (c.id === cur && UI.tool !== 'demolish' ? ' on' : ''), onclick: () => { if (!UI.buildOpen) toggleBar(); if (ins) UI.fcat = c.id; else UI.cat = c.id; if (UI.tool === 'demolish') UI.tool = 'select'; renderBar(); sfx('ui'); } }, c.icon, h('span', null, c.name))),
     ins ? null : h('button', { class: 'cat tool' + (UI.tool === 'demolish' ? ' on' : ''), title: 'Снести постройку (X) — вернёт 60% материалов', onclick: () => setTool(UI.tool === 'demolish' ? 'select' : 'demolish') }, '🗑️', h('span', null, 'Снести')),
-    h('button', { class: 'cat tool', title: 'Свернуть панель (B)', onclick: toggleBar }, '⌄'));
+  ].filter(Boolean));
   const list = ins ? Object.values(FDEF).filter((d) => d.cat === cur) : Object.values(BDEF).filter((d) => d.cat === cur);
   cardRow.replaceChildren(...list.map((d) => card(d, ins)));
   lastSig = '';
@@ -63,7 +64,7 @@ function tipHtml(d, ins) {
   const cost = Object.entries(d.cost).map(([k, v]) => `<span class="${eco.count(k) >= v ? '' : 'miss'}">${v}${itemIcon(k)} ${itemName(k)}</span>`).join(' · ') || 'бесплатно';
   const lock = ins ? furnLock(d) : (unlocked(d) ? '' : lockReason(d));
   const sz = d.wall ? `${d.size[0]} на стене` : `${d.size[0]}×${d.size[1]}`;
-  return `<b>${d.icon} ${d.name}</b> <small>· ${sz}</small><div class="tdesc">${d.desc || ''}</div><div class="tcost">${cost}</div>${lock ? `<div class="tlock">🔒 ${lock}</div>` : ''}${d.drag ? '<div class="tnote">Тяни мышью, чтобы поставить несколько</div>' : ''}`;
+  return `<b>${d.icon} ${d.name}</b> <small>· ${sz}</small><div class="tdesc">${d.desc || ''}</div><div class="tcost">${cost}</div>${lock ? `<div class="tlock">🔒 ${lock}</div>` : ''}${d.drag ? '<div class="tnote">Тяни, чтобы поставить несколько</div>' : ''}`;
 }
 export function updateCards() {
   const ins = inside();

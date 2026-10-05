@@ -151,3 +151,6 @@ body.touch #menu-btns button { padding: 8px 11px; }
   .recipes.big .recipe { grid-template-columns: 1fr auto; } .recipes.big .r-in { grid-column: 1; } .ctrl { grid-template-columns: 1fr; }
   .toast { font-size: 13px; max-width: 92vw; } #toasts { top: 150px; }
 }
+
+.bb-handle { position: absolute; top: -33px; right: 18px; padding: 3px 22px 2px; min-height: 0 !important; font-size: 18px; line-height: 1.2; border-radius: 14px 14px 0 0; background: var(--paper); border-bottom: 0; box-shadow: 0 -3px 10px rgba(60, 35, 15, .14); }
+body.touch .bb-handle { padding: 6px 28px 4px; top: -38px; }

@@ -81,5 +81,5 @@ export function updateHUD(dt) {
   els.sleep.style.display = G.player.sleeping ? 'block' : 'none';
   const tb = $('#touchbar'), on = UI.touch && UI.tool === 'build' && !!R.ghost;
   tb.style.display = on ? 'flex' : 'none';
-  if (on) { tb.style.bottom = ($('#buildbar').offsetHeight + 22) + 'px'; tb.firstChild.disabled = !R.ghost.valid; }
+  if (on) { tb.style.bottom = (innerHeight - $('#buildbar').getBoundingClientRect().top + 10) + 'px'; tb.firstChild.disabled = !R.ghost.valid; }
 }

@@ -11,12 +11,12 @@ const built = (id) => (G.built[id] || 0) > 0;
 const anyB = (f) => { for (const b of G.bMap.values()) if (f(b, BDEF[b.t])) return true; return false; };
 export const GOALS = [
   { id: 'fire', ic: '🔥', name: 'Первый огонь', desc: 'Построй костёр (меню «Лагерь») и разожги его. Огонь — это тепло, свет и горячая еда.', ok: () => st('fires') >= 1, reward: { sticks: 6 } },
-  { id: 'gather', ic: '🧺', name: 'Всё своими руками', desc: 'Собери 10 ресурсов: хворост, камни, ягоды, волокна… Просто кликай по ним.', ok: () => st('gathered') >= 10, reward: { fiber: 6 } },
+  { id: 'gather', ic: '🧺', name: 'Всё своими руками', desc: 'Собери 10 ресурсов: хворост, камни, ягоды, волокна… Просто нажимай на них.', ok: () => st('gathered') >= 10, reward: { fiber: 6 } },
   { id: 'tent', ic: '⛺', name: 'Крыша над головой', desc: 'Поставь палатку — твой первый дом.', ok: () => built('home'), reward: { cloth: 2 } },
   { id: 'drink', ic: '💧', name: 'Глоток воды', desc: 'Напейся: из пруда, из ведра (нажми на воду в инвентаре) или из колодца.', ok: () => st('drinks') >= 1 || st('eaten') >= 1, reward: { berries: 3 } },
   { id: 'cook', ic: '🍠', name: 'Горячая еда', desc: 'Приготовь что-нибудь на костре: например, печёную картошку или рыбу.', ok: () => st('cooked') >= 1, reward: { seed_tomato: 2 } },
   { id: 'bench', ic: '🔨', name: 'Верстак', desc: 'Построй верстак: доски, верёвка, гвозди и всё остальное.', ok: () => built('workbench'), reward: { wood: 8 } },
-  { id: 'furnish', ic: '🛏️', name: 'Домашний уют', desc: 'Войди в дом (двойной клик) и расставь внутри 3 предмета.', ok: () => st('furn') >= 3, reward: { cloth: 4 } },
+  { id: 'furnish', ic: '🛏️', name: 'Домашний уют', desc: 'Войди в дом (нажми на него дважды) и расставь внутри 3 предмета.', ok: () => st('furn') >= 3, reward: { cloth: 4 } },
   { id: 'sleep', ic: '😴', name: 'Сладкий сон', desc: 'Поспи в постели. Ночью это особенно приятно.', ok: () => st('sleeps') >= 1, reward: { feather: 2 } },
   { id: 'plant', ic: '🌱', name: 'Первый посев', desc: 'Построй грядку, выбери семена и посади что-нибудь.', ok: () => st('planted') >= 1, reward: { seed_cabbage: 2 } },
   { id: 'harvest', ic: '🥕', name: 'Первый урожай', desc: 'Дождись, пока вырастет, и собери урожай.', ok: () => st('harvested') >= 1, reward: { seed_wheat: 3 } },
@@ -27,7 +27,7 @@ export const GOALS = [
   { id: 'lights', ic: '🕯️', name: 'Огоньки вечера', desc: 'Поставь три источника света: факелы, фонари или костры.', ok: () => [...G.bMap.values()].filter((b) => BDEF[b.t].light).length >= 3, reward: { wax: 2 } },
   { id: 'eggs', ic: '🥚', name: 'Свежие яйца', desc: 'Построй курятник, накорми и напои кур — и собери яйца.', ok: () => st('eggs') >= 1, reward: { feather: 2 } },
   { id: 'honey', ic: '🍯', name: 'Сладкая жизнь', desc: 'Улей и цветы рядом — мёд не заставит себя ждать.', ok: () => st('honey') >= 1, reward: { wax: 2 } },
-  { id: 'fish', ic: '🎣', name: 'Рыбацкая удача', desc: 'Сделай удочку (C) и поймай 3 рыбы.', ok: () => st('fish') >= 3, reward: { rope: 2 } },
+  { id: 'fish', ic: '🎣', name: 'Рыбацкая удача', desc: 'Сделай удочку (кнопка ✋ — ручная работа) и поймай 3 рыбы.', ok: () => st('fish') >= 3, reward: { rope: 2 } },
   { id: 'bread', ic: '🍞', name: 'Запах хлеба', desc: 'Пшеница → жернова → мука → печь. Испеки хлеб.', ok: () => !!(G.stats.cookedItems || {}).bread, reward: { honey: 2 } },
   { id: 'pie', ic: '🥧', name: 'Пирог на столе', desc: 'Испеки яблочный или ягодный пирог.', ok: () => !!((G.stats.cookedItems || {}).apple_pie || (G.stats.cookedItems || {}).berry_pie), reward: { seed_strawberry: 3 } },
   { id: 'sprinkler', ic: '💦', name: 'Автополив', desc: 'Проведи трубы и поставь дождеватель рядом с грядками.', ok: () => anyB((b) => b.t === 'sprinkler' && G.comp.water.get(b.id) && S.netOf(b, 'water').stock > 0), reward: { scrap: 3 } },

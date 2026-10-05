@@ -29,7 +29,7 @@ reg([
   },
   {
     id: 'cable', name: 'Провод', cat: 'power', icon: '〰️', cost: { scrap: 1, fiber: 1 }, req: ['solar_panel'], flat: true, walk: true, drag: true, norot: true, h: 8,
-    desc: 'Тянет электричество от панели к потребителям. Соединяется с соседними проводами и приборами. Тяни мышью.',
+    desc: 'Тянет электричество от панели к потребителям. Соединяется с соседними проводами и приборами. Протяни, чтобы проложить.',
     tags: ['conduit'], net: { power: { cap: 0 } }, conduit: 'power', key: (b) => b.mask || 0,
     draw(c, b) { conduit(c, b, '#3c3f48', .06, '#2a2c33'); },
   },

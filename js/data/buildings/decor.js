@@ -11,7 +11,7 @@ reg([
   // ---------- дорожки ----------
   {
     id: 'path_dirt', name: 'Тропинка', cat: 'decor', icon: '🟫', cost: {}, flat: true, walk: true, drag: true, speed: 1.2, cozy: 0.2, h: 4, norot: true,
-    desc: 'Утоптанная земля. Бесплатная дорожка — по ней ходить быстрее. Тяни мышью.',
+    desc: 'Утоптанная земля. Бесплатная дорожка — по ней ходить быстрее. Протяни, чтобы проложить.',
     key: (b) => b.v % 4,
     draw(c, b) { pathBase(c, b, '#b99b6e'); plane(c, 0, (g) => { g.fillStyle = '#a78a5f'; for (let i = 0; i < 5; i++) { g.beginPath(); g.ellipse(.15 + hash2(b.v, i, 1) * .7, .15 + hash2(b.v, i, 2) * .7, .05, .03, 0, 0, 7); g.fill(); } }); },
   },

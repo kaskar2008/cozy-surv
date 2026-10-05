@@ -96,7 +96,7 @@ export function canPlace(def, x, y, rot) {
 // Подсказки при первой постройке (один раз)
 const HINTS = {
   campfire: 'Нажми на костёр и выбери «Разжечь». Рядом можно поставить котелок, чайник и лавочки 🔥',
-  home: 'Двойной клик по дому — зайти внутрь и расставить мебель 🏠',
+  home: 'Нажми на дом дважды — зайти внутрь и расставить мебель 🏠',
   rain_collector: 'Дождесборник вмещает мало воды. Поставь вплотную бак — и дожди будут копиться про запас 💧',
   tank: 'Баки, колодец и трубы объединяются в сеть, если стоят вплотную. Подключай грядки, душ, дождеватели, дом…',
   pot: 'Котелок работает только вплотную к горящему огню 🔥', kettle: 'Чайник работает только вплотную к горящему огню 🔥',
@@ -170,7 +170,7 @@ export function demolish(b) {
 
 // ---------------------------------------------------------------- сбор ресурсов
 export function hasTool(t) { return eco.has(t, 1); }
-export function toolMsg(t) { return `Нужен инструмент «${itemName(t)}» — сделай его (клавиша C: ручная работа)`; }
+export function toolMsg(t) { return `Нужен инструмент «${itemName(t)}» — сделай его (кнопка ✋ — ручная работа)`; }
 
 function rollGive(give) {
   const out = {};
@@ -207,7 +207,7 @@ export function gatherNode(n) {
 
 // ---------------------------------------------------------------- вода, рыбалка
 export function fishFrom(wx, wy) {
-  if (!hasTool('rod')) { toast('Нужна удочка — сделай её в ручной работе (C)', 'warn'); return; }
+  if (!hasTool('rod')) { toast('Нужна удочка — сделай её в ручной работе (кнопка ✋)', 'warn'); return; }
   // ближайшая клетка суши рядом с точкой воды
   let best = null, bd = 1e9;
   for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const x = wx + dx, y = wy + dy; if (!inB(x, y) || G.blk[ti(x, y)]) continue; const dd = Math.hypot(dx, dy); if (dd < bd && nearWater(x, y, 1)) { bd = dd; best = [x, y]; } }
@@ -227,7 +227,7 @@ export function fishFrom(wx, wy) {
   });
 }
 export function fetchWaterNatural(wx, wy) {
-  if (!hasTool('bucket')) { toast('Нужно ведро — сделай его в ручной работе (C)', 'warn'); return; }
+  if (!hasTool('bucket')) { toast('Нужно ведро — сделай его в ручной работе (кнопка ✋)', 'warn'); return; }
   if (eco.space('water') <= 0) { toast('Вёдра уже полные', 'warn'); return; }
   let best = null, bd = 1e9;
   for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const x = wx + dx, y = wy + dy; if (!inB(x, y) || G.blk[ti(x, y)]) continue; const dd = Math.hypot(dx, dy); if (dd < bd && nearWater(x, y, 1)) { bd = dd; best = [x, y]; } }

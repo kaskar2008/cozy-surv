@@ -22,7 +22,7 @@ export function updatePets(dt) {
       if (b.st.petT > 80 && G.cozy.total >= 6) {
         const x = b.x + .5, y = b.y + b.d + .6;
         G.pets.push({ kind: d.pet, home: b.id, x, y, face: 1, moving: false, sleep: false, t: 2, love: 0, col: pick(COLS[d.pet]) });
-        toast(d.pet === 'cat' ? 'В кошкином доме кто-то поселился! 🐈 Погладь его (клик по коту)' : 'У будки появился пёс! 🐕 Погладь его', 'goal'); sfx(d.pet === 'cat' ? 'meow' : 'woof');
+        toast(d.pet === 'cat' ? 'В кошкином доме кто-то поселился! 🐈 Погладь его (нажми на кота)' : 'У будки появился пёс! 🐕 Погладь его', 'goal'); sfx(d.pet === 'cat' ? 'meow' : 'woof');
         fx.hearts(x, y, 20);
       }
     }
