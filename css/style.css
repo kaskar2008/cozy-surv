@@ -79,11 +79,12 @@ small { color: var(--ink2); font-size: 12px; }
 /* строительство */
 #buildbar { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); width: min(1100px, calc(100vw - 20px)); border-radius: 20px; padding: 8px 10px 10px; transition: transform .25s; }
 #buildbar.closed { transform: translate(-50%, calc(100% - 44px)); }
-.cats { display: flex; gap: 4px; margin-bottom: 8px; overflow-x: auto; scrollbar-width: none; }
-.cat { display: flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: 12px; white-space: nowrap; font-size: 14px; background: transparent; border-color: transparent; }
+.cats { display: flex; gap: 4px; margin-bottom: 8px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; touch-action: pan-x; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+.cats::-webkit-scrollbar, .cards::-webkit-scrollbar { display: none; }
+.cat { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: 12px; white-space: nowrap; font-size: 14px; background: transparent; border-color: transparent; }
 .cat.on { background: var(--accent2); border-color: #d9964a; font-weight: 700; } .cat.tool { margin-left: auto; } .cat.tool + .cat { margin-left: 0; }
 .cat:first-child.tool { margin-left: 0; margin-right: 6px; border-color: var(--line); } .cat.tool:not(:first-child) { margin-left: 4px; }
-.cards { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.cards { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; touch-action: pan-x; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
 .card { flex: 0 0 auto; width: 104px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 6px 7px; border-radius: 14px; position: relative; background: #fffaf0; }
 .card .ico { font-size: 32px; line-height: 1.1; } .card .nm { font-size: 12.5px; font-weight: 700; text-align: center; line-height: 1.15; min-height: 29px; display: flex; align-items: center; }
 .card .cost { font-size: 12px; display: flex; flex-wrap: wrap; justify-content: center; gap: 1px 5px; color: var(--ink2); min-height: 16px; } .card .cost .miss { color: var(--red); } .card .cost.free { color: var(--green); font-weight: 700; }

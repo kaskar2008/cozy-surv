@@ -18,7 +18,7 @@ export function buildBar() {
   catRow = h('div', { class: 'cats' }); cardRow = h('div', { class: 'cards' });
   handle = h('button', { class: 'bb-handle', title: 'Свернуть / развернуть панель (B)', onclick: toggleBar }, '⌄');
   root.append(handle, catRow, cardRow);
-  root.addEventListener('wheel', (e) => { if (e.deltaY) { cardRow.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
+  root.addEventListener('wheel', (e) => { const row = catRow.contains(e.target) ? catRow : cardRow; const d = e.deltaX || e.deltaY; if (d) { row.scrollLeft += d; e.preventDefault(); } }, { passive: false });
   renderBar();
 }
 const inside = () => G.scene !== 'world';
