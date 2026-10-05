@@ -56,7 +56,7 @@ function boot() {
   if (hasSave() && load()) { /* продолжаем */ } else { newGame(); fresh = true; }
   ensureLinks(); computeCozy();
   initUI(); buildHUD(); buildBar(); initPanel(); initInput(canvas);
-  centerOn(G.player.x, G.player.y); cam.zoom = 1.05;
+  centerOn(G.player.x, G.player.y); cam.zoom = innerWidth < 700 ? 0.8 : 1.05;
   G.speed = G.speed ?? 1; if (G.speed === 0 && !fresh) G.speed = 1;
   renderBar();
   setInterval(() => save(), 30000);

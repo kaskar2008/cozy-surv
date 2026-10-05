@@ -30,49 +30,81 @@ export function initInput(cv) {
   cv.addEventListener('pointerdown', onDown);
   addEventListener('pointermove', onMove);
   addEventListener('pointerup', onUp);
-  cv.addEventListener('pointerleave', () => { UI.mouse.in = false; R.ghost = null; R.hover = null; hideTip(); });
+  addEventListener('pointercancel', onUp);
+  cv.addEventListener('pointerleave', (e) => { if (e.pointerType === 'touch') return; UI.mouse.in = false; R.ghost = null; R.hover = null; hideTip(); });
   cv.addEventListener('pointerenter', () => { UI.mouse.in = true; });
   cv.addEventListener('wheel', (e) => { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0012)); }, { passive: false });
   addEventListener('keydown', onKey);
   addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
   addEventListener('blur', () => keys.clear());
+  // iOS: не давать странице масштабироваться жестами
+  for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, (e) => e.preventDefault());
 }
 const inside = () => G.scene !== 'world';
 const curDef = () => (inside() ? UI.fdef : UI.def);
 
+// ---- касания: несколько пальцев — щипок и перемещение камеры ----
+const pointers = new Map();
+let gesture = null, gestureEnd = 0;
+const mid = () => { const p = [...pointers.values()]; return { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2, d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1 }; };
+const FINGER_LIFT = 52; // призрак выше пальца, чтобы его было видно
+const liftFor = (d) => (UI.touch && !(d && d.drag && !inside()) ? FINGER_LIFT : 0);
+
 function onDown(e) {
   initAudio();
-  UI.mouse.x = e.clientX; UI.mouse.y = e.clientY; UI.mouse.in = true;
+  UI.touch = e.pointerType === 'touch';
+  document.body.classList.toggle('touch', UI.touch);
+  if (UI.touch) {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size >= 2 && !UI.modal) {
+      const m = mid(); gesture = { d: m.d, x: m.x, y: m.y }; drag = null; placing = false; return;
+    }
+  }
+  const bd = UI.tool === 'build' ? curDef() : null;
+  UI.mouse.x = e.clientX; UI.mouse.y = e.clientY - liftFor(bd); UI.mouse.in = true;
   if (G.player.sleeping) { api.wakeUp(); return; }
   if (e.button === 1 || e.button === 2) { drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false, btn: e.button }; return; }
   if (e.button !== 0) return;
   if (UI.modal) return;
-  if (e.pointerType === 'touch' && !(UI.tool === 'build' && curDef())) {
+  if (UI.touch && !bd) {
     drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false, btn: 0, touch: true };
     return;
   }
-  if (UI.tool === 'build' && curDef()) {
+  if (bd) {
     updateGhost(true);
-    const d = curDef();
-    placing = !!d.drag && !inside();
+    placing = !!bd.drag && !inside();
     lastTile = ghostKey;
-    tryPlace();
+    if (!UI.touch || placing) tryPlace();      // на тач-экране обычные постройки ставятся кнопкой «Поставить»
     lastXY = R.ghost ? { x: R.ghost.x, y: R.ghost.y } : null;
     return;
   }
-  const key = `${Math.round(e.clientX / 12)}:${Math.round(e.clientY / 12)}`;
+  tap(e.clientX, e.clientY);
+}
+function tap(x, y) {
+  const key = `${Math.round(x / 12)}:${Math.round(y / 12)}`;
   const dbl = performance.now() - lastTapT < 360 && key === lastTapKey;
   lastTapT = performance.now(); lastTapKey = key;
-  if (inside()) clickInterior(e.clientX, e.clientY, dbl); else clickWorld(e.clientX, e.clientY, dbl);
+  if (inside()) clickInterior(x, y, dbl); else clickWorld(x, y, dbl);
 }
 function onMove(e) {
-  UI.mouse.x = e.clientX; UI.mouse.y = e.clientY;
+  if (UI.touch && pointers.has(e.pointerId)) {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (gesture && pointers.size >= 2) {
+      const m = mid();
+      zoomAt(m.x, m.y, m.d / gesture.d);
+      if (!inside()) { cam.x -= (m.x - gesture.x) / cam.zoom; cam.y -= (m.y - gesture.y) / cam.zoom; clampCam(); }
+      gesture = { d: m.d, x: m.x, y: m.y };
+      return;
+    }
+  }
+  const bd = UI.tool === 'build' ? curDef() : null;
+  UI.mouse.x = e.clientX; UI.mouse.y = e.clientY - (e.pointerType === 'touch' ? liftFor(bd) : 0);
   const onCanvas = e.target === canvas;
   if (onCanvas && !UI.mouse.in) hideTip();
   UI.mouse.in = onCanvas;
   if (drag) {
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-    if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+    if (Math.abs(dx) + Math.abs(dy) > (drag.touch ? 9 : 4)) drag.moved = true;
     if (drag.moved && !inside()) { cam.x = drag.cx - dx / cam.zoom; cam.y = drag.cy - dy / cam.zoom; clampCam(); }
     return;
   }
@@ -88,19 +120,27 @@ function onMove(e) {
       if (!n) tryPlace(true);
       lastXY = { x: g.x, y: g.y }; updateCards(); ghostKey = ''; updateGhost(true);
     }
-  }
+  } else if (UI.touch && bd && e.target === canvas && e.pressure !== 0) updateGhost(true);
 }
 function onUp(e) {
+  initAudio();
+  if (e.pointerType === 'touch') {
+    pointers.delete(e.pointerId);
+    if (gesture) { if (pointers.size < 2) gesture = null; gestureEnd = performance.now(); drag = null; placing = false; return; }
+    if (performance.now() - gestureEnd < 250) { drag = null; return; }
+    if (e.type === 'pointercancel') { drag = null; placing = false; return; }
+  }
   if (drag && e.button === drag.btn) {
     const d0 = drag; drag = null;
-    if (!d0.moved && d0.touch) {
-      const key = `${Math.round(e.clientX / 12)}:${Math.round(e.clientY / 12)}`, dbl = performance.now() - lastTapT < 360 && key === lastTapKey;
-      lastTapT = performance.now(); lastTapKey = key;
-      if (inside()) clickInterior(e.clientX, e.clientY, dbl); else clickWorld(e.clientX, e.clientY, dbl);
-    } else if (!d0.moved && e.button === 2) { if (UI.tool !== 'select') cancelBuild(); else clearSelection(); }
+    if (!d0.moved && d0.touch) tap(e.clientX, e.clientY);
+    else if (!d0.moved && e.button === 2) { if (UI.tool !== 'select') cancelBuild(); else clearSelection(); }
   }
   if (e.button === 0) placing = false;
 }
+// кнопки тач-панели размещения
+export function confirmPlace() { updateGhost(true); tryPlace(false); }
+export function rotateGhost() { UI.rot ^= 1; ghostKey = ''; updateGhost(true); }
+
 function onKey(e) {
   if (e.target && /input|textarea/i.test(e.target.tagName)) return;
   const k = e.key.toLowerCase();
@@ -109,7 +149,7 @@ function onKey(e) {
   keys.add(k);
   switch (k) {
     case 'b': toggleBar(); break;
-    case 'r': UI.rot ^= 1; ghostKey = ''; break;
+    case 'r': rotateGhost(); break;
     case 'x': if (!inside()) setTool(UI.tool === 'demolish' ? 'select' : 'demolish'); break;
     case 'c': openCraft(); break;
     case 'i': openInventory(); break;
@@ -119,7 +159,7 @@ function onKey(e) {
     case '1': setSpeed(1); break;
     case '2': setSpeed(2); break;
     case '3': setSpeed(4); break;
-    case ' ': e.preventDefault(); if (!inside()) centerOn(G.player.x, G.player.y); break;
+    case ' ': e.preventDefault(); centerPlayer(); break;
     case 'f': takePhoto(); break;
     case '+': case '=': zoomAt(cam.W / 2, cam.H / 2, 1.15); break;
     case '-': case '_': zoomAt(cam.W / 2, cam.H / 2, 1 / 1.15); break;
@@ -223,6 +263,7 @@ function clickInterior(mx, my, dbl) {
 
 // ---------------------------------------------------------------- обновление
 export function updateInput(dt) {
+  if (cam.goto) { const k = Math.min(1, dt * 7), g = cam.goto; cam.y += g.dy * k; g.dy *= 1 - k; if (Math.abs(g.dy) < 0.5) cam.goto = null; }
   // камера
   if (!inside() && !UI.modal) {
     let dx = 0, dy = 0; const sp = 700 / cam.zoom * dt;
@@ -238,7 +279,7 @@ export function updateInput(dt) {
   if (UI.tool === 'build') updateGhost(false);
   // подсветка под курсором
   hoverT -= dt;
-  if (hoverT <= 0 && UI.mouse.in && !UI.modal && !drag && UI.tool !== 'build') {
+  if (hoverT <= 0 && UI.mouse.in && !UI.touch && !UI.modal && !drag && UI.tool !== 'build') {
     hoverT = .08;
     if (inside()) {
       const home = homeOf(); const r = home && pickInterior(home, UI.mouse.x, UI.mouse.y);
@@ -268,3 +309,5 @@ export function takePhoto() {
     });
   }));
 }
+
+export function centerPlayer() { if (!inside()) centerOn(G.player.x, G.player.y); }

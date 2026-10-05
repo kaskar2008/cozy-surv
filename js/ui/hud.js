@@ -9,7 +9,9 @@ import { nextGoals } from '../game/goals.js';
 import { UI } from './state.js';
 import { toast } from './ui.js';
 import { openInventory, openCraft, openJournal, openMenu } from './modals.js';
-import { takePhoto } from '../input.js';
+import { takePhoto, confirmPlace, rotateGhost, centerPlayer } from '../input.js';
+import { R } from '../render/scene.js';
+import { cancelBuild } from './buildbar.js';
 import { isMuted, setMuted, initAudio } from '../core/audio.js';
 import { exitHome, homeOf } from '../game/interior.js';
 import { bldName, wakeUp, startSleep } from '../game/api.js';
@@ -30,8 +32,13 @@ export function buildHUD() {
     h('div', { id: 'interior-banner' }),
     h('div', { id: 'sleepmsg' }, '😴 Спишь… нажми, чтобы проснуться'),
   );
+  ui.append(h('div', { id: 'touchbar' },
+    h('button', { class: 'primary', onclick: confirmPlace }, '✓ Поставить'),
+    h('button', { title: 'Повернуть', onclick: rotateGhost }, '↻'),
+    h('button', { title: 'Отмена', onclick: cancelBuild }, '✕')));
   $('#rightcol').prepend(
     h('div', { id: 'menu-btns' },
+      h('button', { title: 'К персонажу (Пробел)', onclick: centerPlayer }, '🎯'),
       h('button', { title: 'Рюкзак (I)', onclick: openInventory }, '🎒'),
       h('button', { title: 'Ручная работа (C)', onclick: openCraft }, '✋'),
       h('button', { title: 'Журнал и уют (J)', onclick: openJournal }, '📖'),
@@ -53,7 +60,7 @@ export function updateHUD(dt) {
   els.season.textContent = `${SEASON_ICON[season()]} ${SEASONS[season()]}`; els.day.textContent = `День ${day() + 1}`; els.clock.textContent = fmtClock();
   els.wx.textContent = WX[G.weather.type]; els.wx.title = { clear: 'Ясно', cloudy: 'Облачно', rain: 'Дождь', fog: 'Туман', snow: 'Снег' }[G.weather.type];
   syncSpeed();
-  document.querySelectorAll('.need').forEach((n) => { const k = n.dataset.k, v = G.needs[k]; n.querySelector('i').style.width = Math.max(2, v) + '%'; n.classList.toggle('low', v < 22); n.title = `${n.title.split(':')[0]}: ${Math.round(v)}`; });
+  document.querySelectorAll('.need').forEach((n) => { const k = n.dataset.k, v = G.needs[k]; n.querySelector('i').style.width = Math.max(2, v) + '%'; n.style.setProperty('--v', Math.max(.04, v / 100)); n.style.setProperty('--c', NEEDS.find((x) => x[0] === k)[3]); n.classList.toggle('low', v < 22); n.title = `${n.title.split(':')[0]}: ${Math.round(v)}`; });
   const lv = cozyLevel(G.cozy.total);
   els.czn.textContent = G.cozy.total; els.czname.textContent = lv.name;
   els.czbar.style.width = (lv.next ? Math.min(100, (G.cozy.total - lv.prev) / (lv.next - lv.prev) * 100) : 100) + '%';
@@ -72,4 +79,7 @@ export function updateHUD(dt) {
   if (home) { const bsig = bldName(home) + G.cozy.total; if (els.bsig !== bsig) { els.bsig = bsig; els.banner.replaceChildren(h('span', null, '🏠 Внутри: ' + bldName(home)), h('button', { title: 'Поспать прямо на полу — без кровати хуже', onclick: () => { if (G.needs.energy > 92) toast('Совсем не хочется спать'); else startSleep('floor', 0.7); } }, '💤 Прилечь'), h('button', { onclick: exitHome }, '↩ Выйти из дома')); } els.banner.style.display = 'flex'; }
   else { els.banner.style.display = 'none'; els.bsig = null; }
   els.sleep.style.display = G.player.sleeping ? 'block' : 'none';
+  const tb = $('#touchbar'), on = UI.touch && UI.tool === 'build' && !!R.ghost;
+  tb.style.display = on ? 'flex' : 'none';
+  if (on) { tb.style.bottom = ($('#buildbar').offsetHeight + 22) + 'px'; tb.firstChild.disabled = !R.ghost.valid; }
 }

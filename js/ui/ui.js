@@ -31,7 +31,9 @@ export function closeModal(silent) {
   const m = UI.modal; UI.modal = null; m.wrap.remove(); if (m.onClose && !silent) m.onClose();
 }
 let tipEl = null;
+let tipT = 0;
 export function showTip(html, x, y) {
+  clearTimeout(tipT); if (UI.touch) tipT = setTimeout(hideTip, 2200);
   if (!tipEl) { tipEl = h('div', { id: 'tooltip' }); document.body.append(tipEl); }
   tipEl.innerHTML = html; tipEl.style.display = 'block';
   const r = tipEl.getBoundingClientRect();

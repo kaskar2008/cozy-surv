@@ -8,6 +8,11 @@ export function screenToWorld(px, py, z = 0) {
   const u = (px - cam.W / 2) / cam.zoom + cam.x, v = (py - cam.H / 2) / cam.zoom + cam.y + z;
   return [(u / HW + v / HH) / 2, (v / HH - u / HW) / 2];
 }
+export function focusUpper(x, y, z = 14) {
+  if (innerWidth >= 700) return;
+  const [, sy] = worldToScreen(x, y, z);
+  cam.goto = { dx: 0, dy: (sy - cam.H * 0.28) / cam.zoom };
+}
 export function centerOn(x, y) { cam.x = (x - y) * HW; cam.y = (x + y) * HH; }
 export function zoomAt(px, py, f) {
   const [wx, wy] = screenToWorld(px, py);

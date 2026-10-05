@@ -22,6 +22,7 @@ export function buildBar() {
 }
 const inside = () => G.scene !== 'world';
 export function setTool(t) {
+  hideTip();
   UI.tool = t; if (t !== 'build') { UI.def = null; UI.fdef = null; R.ghost = null; }
   renderBar(true);
 }
@@ -46,8 +47,8 @@ function card(d, ins) {
     h('div', { class: 'cost' }, ...Object.entries(d.cost).map(([k, v]) => h('span', { 'data-k': k, 'data-n': v }, `${v}${itemIcon(k)}`))),
     d.cost && !Object.keys(d.cost).length ? h('div', { class: 'cost free' }, 'бесплатно') : null,
     h('div', { class: 'lock' }, '🔒'));
-  el.addEventListener('pointerenter', (e) => showTip(tipHtml(d, ins), e.clientX, e.clientY));
-  el.addEventListener('pointermove', (e) => showTip(tipHtml(d, ins), e.clientX, e.clientY));
+  el.addEventListener('pointerenter', (e) => { if (e.pointerType !== 'touch') showTip(tipHtml(d, ins), e.clientX, e.clientY); });
+  el.addEventListener('pointermove', (e) => { if (e.pointerType !== 'touch') showTip(tipHtml(d, ins), e.clientX, e.clientY); });
   el.addEventListener('pointerleave', hideTip);
   return el;
 }
