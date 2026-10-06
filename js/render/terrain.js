@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { G, N } from '../game/state.js';
 import { T, inB } from '../game/world.js';
 import { shade, hash2 } from '../core/util.js';
-import { Buf, rgba } from '../core/iso.js';
+import { Builder, rgba, cone, blob, setSwap } from '../core/iso.js';
 import { MAT, geoFrom } from './models.js';
 import { cam, worldToScreen, viewTiles } from './camera.js';
 
@@ -29,12 +29,38 @@ function buildColors(season) {
   }
 }
 
+// мелкие детали земли: травинки, цветочки, камешки (по G.det)
+function addDetails(c, season) {
+  const winter = season === 3;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const i = y * N + x, t = G.tiles[i], d = G.det[i];
+    if (!d || t === T.WATER) continue;
+    const base = PAL[t][season];
+    if (t === T.GRASS || t === T.FOREST) {
+      const dark = shade(base, winter ? -.1 : -.14), lite = shade(base, .12);
+      for (let j = 0; j < 2 + d; j++) {
+        const fx = .15 + hash2(x, y, 11 + j) * .7, fy = .15 + hash2(x, y, 31 + j) * .7, h = 6 + hash2(x, y, 51 + j) * 7;
+        cone(c, x + fx, y + fy, 0, .022, h, j % 2 ? dark : lite);
+      }
+      if (d === 3 && !winter && t === T.GRASS) {
+        const fc = ['#fff2b8', '#ffd6e0', '#e6e0ff'][season % 3];
+        for (let j = 0; j < 2; j++) blob(c, x + .2 + hash2(x, y, 71 + j) * .6, y + .2 + hash2(x, y, 81 + j) * .6, 3.5, 1.9, 1.9, fc);
+      }
+    } else if (t === T.SAND) {
+      for (let j = 0; j < 3; j++) blob(c, x + .15 + hash2(x, y, 91 + j) * .7, y + .15 + hash2(x, y, 101 + j) * .7, 1, 1.5, .9, shade(base, -.1));
+    } else {
+      for (let j = 0; j < 2; j++) blob(c, x + .15 + hash2(x, y, 111 + j) * .7, y + .15 + hash2(x, y, 121 + j) * .7, 1.6, 3.4, 2, shade(base, j ? .1 : -.12));
+    }
+  }
+}
+
 let group = null, cTiles = null, cSeason = -1, cVer = -1, sparkles = null;
 export function updateTerrain(scene, season) {
   if (group && cTiles === G.tiles && cSeason === season && cVer === G.terrainVer) return;
   if (group) { scene.remove(group); group.traverse((o) => o.geometry?.dispose()); }
   buildColors(season);
-  const b = new Buf(N * N * 8);
+  setSwap(false);
+  const tc = new Builder(N, N, 0), b = tc.lit;
   const up = [0, 1, 0];
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const i = y * N + x, t = G.tiles[i], water = t === T.WATER;
@@ -53,6 +79,7 @@ export function updateTerrain(scene, season) {
       side(x - 1, y, [x, y], [x, y + 1]);           // -x
     }
   }
+  addDetails(tc, season);
   const m = new THREE.Mesh(geoFrom(b), MAT.lit); m.frustumCulled = false; m.receiveShadow = true;
   // бескрайнее море вокруг
   const wg = new THREE.PlaneGeometry(600, 600); wg.rotateX(-Math.PI / 2);
