@@ -3,6 +3,7 @@ import { UI } from './ui/state.js';
 import { G, N, day } from './game/state.js';
 import { cam, screenToWorld, worldToScreen, zoomAt, centerOn, panScreen, rotateCam } from './render/camera.js';
 import { R } from './render/scene.js';
+import { captureFrame } from './render/gl.js';
 import { BDEF } from './data/buildings/index.js';
 import { NDEF } from './data/nodes.js';
 import { FDEF } from './data/furniture.js';
@@ -339,10 +340,11 @@ export function updateInput(dt) {
 }
 
 export function takePhoto() {
-  const ui = document.getElementById('ui'), canvas = document.getElementById('game');
+  const ui = document.getElementById('ui');
   ui.style.visibility = 'hidden'; hideTip();
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    canvas.toBlob((blob) => {
+    const cv = captureFrame(document.getElementById('overlay'));
+    cv.toBlob((blob) => {
       ui.style.visibility = '';
       if (!blob) return;
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `ostrov-den-${day() + 1}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);

@@ -64,7 +64,7 @@ export function exitHome() {
   let best = null, bd = 1e9;
   for (const [x, y] of ringTiles(b.x, b.y, b.w, b.d)) if (walkable(x, y)) { const dd = Math.hypot(x + .5 - tx, y + .5 - ty); if (dd < bd) { bd = dd; best = [x, y]; } }
   if (best) { p.x = best[0] + .5; p.y = best[1] + .5; } else if (G.outPos) { p.x = G.outPos.x; p.y = G.outPos.y; }
-  if (G.outCam) { cam.tx = G.outCam.tx; cam.ty = G.outCam.ty; cam.zoom = G.outCam.zoom; cam.az = cam.azT = G.outCam.az ?? Math.PI / 4; } else centerOn(p.x, p.y);
+  if (G.outCam && G.outCam.tx !== undefined) { cam.tx = G.outCam.tx; cam.ty = G.outCam.ty; cam.zoom = G.outCam.zoom; cam.az = cam.azT = G.outCam.az ?? Math.PI / 4; } else centerOn(p.x, p.y);
   G.sel = null; R.sel = null; R.links = [];
   S.hooks.onSceneChange && S.hooks.onSceneChange();
 }

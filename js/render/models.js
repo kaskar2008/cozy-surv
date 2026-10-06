@@ -76,6 +76,7 @@ export class Instancer {
         s.meshes = s.model.parts.map((p) => {
           const im = new THREE.InstancedMesh(p.geo, p.mat, s.cap);
           im.frustumCulled = false; im.renderOrder = p.order || 0; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+          im.castShadow = p.mat === MAT.lit; im.receiveShadow = p.mat !== MAT.emi;
           this.scene.add(im); return im;
         });
       } else if (!changed) continue;
@@ -92,7 +93,7 @@ export class DynBatch {
     this.meshes = [];
     for (const [key, mat, order] of [['lit', MAT.lit, 0], ['emi', MAT.emi, 0], ['tr', MAT.tr, 2]]) {
       const g = new THREE.BufferGeometry();
-      const m = new THREE.Mesh(g, mat); m.frustumCulled = false; m.renderOrder = order;
+      const m = new THREE.Mesh(g, mat); m.frustumCulled = false; m.renderOrder = order; m.castShadow = key === 'lit'; m.receiveShadow = key !== 'emi';
       scene.add(m); this.meshes.push({ key, g, m, cap: 0 });
     }
   }

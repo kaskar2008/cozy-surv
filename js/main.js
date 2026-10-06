@@ -5,7 +5,8 @@ import { load, save, wipe, getMode, setMode } from './game/save.js';
 import * as cloud from './game/cloud.js';
 import { cam, centerOn } from './render/camera.js';
 import { renderWorld, initScene, R } from './render/scene.js';
-import { resizeGL } from './render/gl.js';
+import * as gl from './render/gl.js';
+import { resizeGL, setShadows } from './render/gl.js';
 import { renderInterior, enterHome, exitHome, placeFurn } from './game/interior.js';
 import { FDEF } from './data/furniture.js';
 import { worldToScreen, screenToWorld, rotateCam } from './render/camera.js';
@@ -35,7 +36,7 @@ function resize() {
   cam.dpr = Math.min(2, window.devicePixelRatio || 1) * quality; cam.W = innerWidth; cam.H = innerHeight;
   overlay.width = Math.floor(cam.W * cam.dpr); overlay.height = Math.floor(cam.H * cam.dpr);
   for (const cv of [canvas, overlay]) { cv.style.width = cam.W + 'px'; cv.style.height = cam.H + 'px'; }
-  resizeGL();
+  resizeGL(); setShadows(quality > 0.7);
 }
 addEventListener('resize', resize); resize();
 
@@ -105,7 +106,7 @@ async function boot() {
     const intro = () => openIntro(() => { delete G.noSave; setSpeed(1); save(); });
     picker ? chooseStorage(intro) : intro();
   }
-  window.cozy = { enterHome, exitHome, placeFurn, FDEF, worldToScreen, screenToWorld, rotateCam, quality: () => quality, G, S, api, BDEF, cam, R, UI, save, load, prof, syncProf: (on) => { hooks.sync = on ? () => ctx.getImageData(0, 0, 1, 1) : null; } };
+  window.cozy = { gl, enterHome, exitHome, placeFurn, FDEF, worldToScreen, screenToWorld, rotateCam, quality: () => quality, G, S, api, BDEF, cam, R, UI, save, load, prof, syncProf: (on) => { hooks.sync = on ? () => ctx.getImageData(0, 0, 1, 1) : null; } };
   requestAnimationFrame(frame);
 }
 boot();

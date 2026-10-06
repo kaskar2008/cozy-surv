@@ -106,7 +106,7 @@ const K = (c, s) => { const k = rgba(s); return c.globalAlpha < 1 ? [k[0], k[1],
 // Мягкая тень на земле (круг радиуса r в клетках)
 export function shadow(c, cx, cy, r, a = 0.2) {
   [cx, cy] = swp(cx, cy);
-  const col = [0.012, 0.007, 0.02, a * 1.5], n = 14, y = 0.012 + c.oy * 0;
+  const col = [0.012, 0.007, 0.02, a * 0.9], n = 14, y = 0.012 + c.oy * 0;
   const ctr = c.V(cx, cy, 0); ctr[1] += 0.012;
   for (let i = 0; i < n; i++) {
     const a0 = i / n * 6.2832, a1 = (i + 1) / n * 6.2832;

@@ -4,19 +4,23 @@ import { cam, EL } from './camera.js';
 import { KX } from '../core/iso.js';
 import { WATER_BG } from './terrain.js';
 
-const HEMI = 2.35, SUN = 1.35;   // в three освещённость делится на π: ~3.4 суммарно даёт полный цвет сверху
+const HEMI = 1.9, SUN = 1.8;   // в three освещённость делится на π: сверху суммарно ~3.4 даёт «полный» цвет; тень оставляет ~55%
 export let renderer = null, scene = null, camera3 = null, hemi = null, sun = null;
 const _dir = new THREE.Vector3();
+const SUN_K = 4;
+export const setShadows = (on) => { if (sun && sun.castShadow !== on) sun.castShadow = on; };
 
 export function initGL(canvas) {
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: false });
   renderer.setClearColor(WATER_BG);
-  renderer.shadowMap.enabled = false;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   scene = new THREE.Scene();
   camera3 = new THREE.OrthographicCamera(-10, 10, 10, -10, -300, 900);
   hemi = new THREE.HemisphereLight('#fff4de', '#cdc4a6', HEMI);
   sun = new THREE.DirectionalLight('#fff0d2', SUN);
   sun.position.set(-7, 11, 3);
+  sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.03;
+  Object.assign(sun.shadow.camera, { near: 1, far: 140 });
   scene.add(hemi, sun, sun.target);
   resizeGL();
   return renderer;
@@ -36,7 +40,11 @@ export function syncCamera() {
   camera3.position.set(cam.tx, 0, cam.ty).addScaledVector(_dir, 200);
   camera3.lookAt(cam.tx, 0, cam.ty);
   sun.target.position.set(cam.tx, 0, cam.ty);
-  sun.position.set(cam.tx - 7, 11, cam.ty + 3);
+  sun.position.set(cam.tx - 7 * SUN_K, 11 * SUN_K, cam.ty + 3 * SUN_K);
+  if (sun.castShadow) {   // карта теней покрывает видимый участок земли
+    const R = Math.hypot(hw, hh / Math.sin(EL)) * 1.06, sc = sun.shadow.camera;
+    if (Math.abs(sc.right - R) > R * .02) { Object.assign(sc, { left: -R, right: R, top: R, bottom: -R }); sc.updateProjectionMatrix(); }
+  }
 }
 // цвет и сила солнца по времени суток: тёплое на закате и рассвете (ночь затемняет оверлей освещения)
 const tmp = new THREE.Color();
@@ -46,4 +54,12 @@ export function setSun(hour, dark, rain) {
   sun.intensity = SUN * (1 - dark * .5) * (rain ? .7 : 1);
   hemi.intensity = HEMI * (1 - dark * .2) * (rain ? .95 : 1);
   hemi.color.set('#fff4de').lerp(tmp.set('#f6b890'), warm * .5);
+}
+
+// Снимок кадра для фотографии: перерисовываем сцену и склеиваем 3D с оверлеем
+export function captureFrame(overlay) {
+  renderer.render(scene, camera3);
+  const cv = document.createElement('canvas'); cv.width = renderer.domElement.width; cv.height = renderer.domElement.height;
+  const c = cv.getContext('2d'); c.drawImage(renderer.domElement, 0, 0); c.drawImage(overlay, 0, 0, cv.width, cv.height);
+  return cv;
 }
