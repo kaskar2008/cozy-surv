@@ -1,8 +1,8 @@
 // Питомцы, путники у костра, письма и прочие маленькие радости.
-import { G, N, day, hour, isNight, season } from './state.js';
+import { G, N, DAY, day, hour, isNight, season } from './state.js';
 import { BDEF } from '../data/buildings/index.js';
 import { FDEF } from '../data/furniture.js';
-import { walkable, flood, pathFrom, T, inB, ti, addNode } from './world.js';
+import { walkable, flood, pathFrom, T, inB, ti, addNode, removeNode } from './world.js';
 import { petWord } from '../data/pets.js';
 import { S, toast, stat, addBuff } from './api.js';
 import { isHot } from './nets.js';
@@ -15,7 +15,18 @@ import { goTo } from './player.js';
 
 // ---------------------------------------------------------------- питомцы
 const COLS = { cat: ['#e8a05a', '#c9c9d0', '#4a4a52', '#f0e0c8'], dog: ['#c9915f', '#8a6a4a', '#e8d8b8'] };
+const POOP_LIFE = DAY * 2;   // через двое суток какашки сами исчезают
+let poopAcc = 0;
+function decayPoops(dt) {
+  poopAcc += dt; if (poopAcc < 5) return; poopAcc = 0;
+  for (const n of [...G.nodeMap.values()]) {
+    if (n.t !== 'poop') continue;
+    n.born ??= G.t;   // старые сохранения: отсчёт с момента загрузки
+    if (G.t - n.born >= POOP_LIFE) removeNode(n);
+  }
+}
 export function updatePets(dt) {
+  decayPoops(dt);
   for (const b of G.bMap.values()) {
     const d = BDEF[b.t]; if (!d.pet || b.bld) continue;
     if (!G.pets.some((p) => p.home === b.id)) {
@@ -85,7 +96,7 @@ function dropPoop(pet) {
   if (k < 0 || G.nAt[k] || G.bAt[k] || G.tiles[k] === T.WATER) return;
   let n = 0; for (const o of G.nodeMap.values()) if (o.t === 'poop') n++;
   if (n >= 6) return;
-  addNode('poop', x, y, { st: 'full' }); stat('poops');
+  addNode('poop', x, y, { st: 'full', born: G.t }); stat('poops');
 }
 function startForage(pet, hb) {
   for (let i = 0; i < 10; i++) {
