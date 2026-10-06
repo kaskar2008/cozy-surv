@@ -326,12 +326,12 @@ export function updateInput(dt) {
     hoverT = .08;
     if (inside()) {
       const home = homeOf(); const r = home && pickInterior(home, UI.mouse.x, UI.mouse.y);
-      if (r?.it) { const d = FDEF[r.it.t]; R.hover = d.wall ? null : { kind: 'it', x: r.it.x, y: r.it.y, w: r.it.w, d: r.it.d }; showTip(`<b>${d.icon} ${d.name}</b>`, UI.mouse.x, UI.mouse.y); }
+      if (r?.it) { const d = FDEF[r.it.t]; R.hover = d.wall ? null : { kind: 'it', x: r.it.x, y: r.it.y, w: r.it.w, d: r.it.d, obj: r.it }; showTip(`<b>${d.icon} ${d.name}</b>`, UI.mouse.x, UI.mouse.y); }
       else { R.hover = r?.tile ? { kind: 'tile', x: r.tile[0], y: r.tile[1] } : null; hideTip(); }
     } else {
       const hit = pickWorld(UI.mouse.x, UI.mouse.y);
-      if (hit?.kind === 'bld') { R.hover = { x: hit.b.x, y: hit.b.y, w: hit.b.w, d: hit.b.d }; showTip(`<b>${BDEF[hit.b.t].icon} ${api.bldName(hit.b)}</b>`, UI.mouse.x, UI.mouse.y); }
-      else if (hit?.kind === 'node') { const g = NDEF[hit.n.t].gather(hit.n); R.hover = { x: hit.n.x, y: hit.n.y, w: 1, d: 1 }; showTip(`<b>${NDEF[hit.n.t].name}</b>${g ? `<div class="tdesc">${g.verb}${g.tool && !eco.has(g.tool) ? ' · нужен ' + g.tool : ''}</div>` : '<div class="tdesc">Пока пусто</div>'}`, UI.mouse.x, UI.mouse.y); }
+      if (hit?.kind === 'bld') { R.hover = { x: hit.b.x, y: hit.b.y, w: hit.b.w, d: hit.b.d, obj: hit.b }; showTip(`<b>${BDEF[hit.b.t].icon} ${api.bldName(hit.b)}</b>`, UI.mouse.x, UI.mouse.y); }
+      else if (hit?.kind === 'node') { const g = NDEF[hit.n.t].gather(hit.n); R.hover = { x: hit.n.x, y: hit.n.y, w: 1, d: 1, obj: hit.n }; showTip(`<b>${NDEF[hit.n.t].name}</b>${g ? `<div class="tdesc">${g.verb}${g.tool && !eco.has(g.tool) ? ' · нужен ' + g.tool : ''}</div>` : '<div class="tdesc">Пока пусто</div>'}`, UI.mouse.x, UI.mouse.y); }
       else if (hit?.kind === 'pet') { R.hover = null; showTip(`<b>${hit.pet.kind === 'cat' ? '🐈 Кот' : '🐕 Пёс'}</b><div class="tdesc">${(hit.pet.hunger ?? 70) < 40 ? 'Голоден — нажми, чтобы покормить (или погладить)' : 'Нажми, чтобы погладить'}</div>`, UI.mouse.x, UI.mouse.y); }
       else if (hit?.kind === 'npc') { R.hover = null; showTip('<b>🧳 Путник</b><div class="tdesc">Поговорить</div>', UI.mouse.x, UI.mouse.y); }
       else { const [wx, wy] = screenToWorld(UI.mouse.x, UI.mouse.y), tx = Math.floor(wx), ty = Math.floor(wy); R.hover = inB(tx, ty) ? { x: tx, y: ty, w: 1, d: 1 } : null; if (inB(tx, ty) && tileAt(tx, ty) === T.WATER) showTip('<b>🌊 Вода</b><div class="tdesc">Рыбалка, ведро, питьё</div>', UI.mouse.x, UI.mouse.y); else hideTip(); }

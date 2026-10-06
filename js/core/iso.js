@@ -74,13 +74,13 @@ export class Buf {
 export class Builder {
   constructor(w = 1, d = 1, h = 40) {
     this.w = w; this.d = d; this.h = h;
-    this.lit = new Buf(); this.emi = new Buf(); this.tr = new Buf();
+    this.lit = new Buf(); this.emi = new Buf(); this.tr = new Buf(); this.shd = new Buf();   // shd — тени на земле: отдельно, чтобы не попадать в контур подсветки
     this.decals = [];
     this.ox = 0; this.oy = 0; this.oz = 0; this.rot = 0; this.cr = 1; this.sr = 0;       // начало координат объекта в мире (для динамических деталей)
     this.tdx = 0; this.tdz = 0; this.stack = [];
     this.fillStyle = '#000'; this.strokeStyle = '#000'; this.lineWidth = 1; this.globalAlpha = 1;
   }
-  reset() { this.lit.reset(); this.emi.reset(); this.tr.reset(); this.decals.length = 0; this.tdx = this.tdz = 0; this.stack.length = 0; }
+  reset() { this.lit.reset(); this.emi.reset(); this.tr.reset(); this.shd.reset(); this.decals.length = 0; this.tdx = this.tdz = 0; this.stack.length = 0; }
   // точка в мире three: учитывает смещение translate() и начало координат
   V(x, y, z) {
     if (this.rot) { const c = this.cr, s = this.sr, X = x * c - y * s; y = x * s + y * c; x = X; }
@@ -108,9 +108,10 @@ export function shadow(c, cx, cy, r, a = 0.2) {
   [cx, cy] = swp(cx, cy);
   const col = [0.012, 0.007, 0.02, a * 0.9], n = 14, y = 0.012 + c.oy * 0;
   const ctr = c.V(cx, cy, 0); ctr[1] += 0.012;
+  const buf = c.dyn ? c.tr : c.shd;
   for (let i = 0; i < n; i++) {
     const a0 = i / n * 6.2832, a1 = (i + 1) / n * 6.2832;
-    c.tr.tri(ctr[0], ctr[1], ctr[2], ctr[0] + Math.cos(a1) * r * 1.02, ctr[1], ctr[2] + Math.sin(a1) * r * 1.02, ctr[0] + Math.cos(a0) * r * 1.02, ctr[1], ctr[2] + Math.sin(a0) * r * 1.02, col);
+    buf.tri(ctr[0], ctr[1], ctr[2], ctr[0] + Math.cos(a1) * r * 1.02, ctr[1], ctr[2] + Math.sin(a1) * r * 1.02, ctr[0] + Math.cos(a0) * r * 1.02, ctr[1], ctr[2] + Math.sin(a0) * r * 1.02, col);
   }
 }
 

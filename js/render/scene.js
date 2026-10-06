@@ -18,6 +18,7 @@ import { isHot } from '../game/nets.js';
 import { workProgress } from '../game/progress.js';
 import { buildConstruction, constructPose } from './construct.js';
 import { mark, now as pnow } from '../core/prof.js';
+import { setOutline, renderOutline } from './outline.js';
 
 // Состояние отрисовки, которое задают ввод и UI
 export const R = { hover: null, ghost: null, sel: null, links: [], grid: false, time: 0 };
@@ -111,6 +112,8 @@ export function renderWorld(ctx, t, dt) {
   updateTerrain(roots.world, season_); p0 = mark('r.terrain', p0);
 
   inst.begin(); dyn.b.reset();
+  const outl = []; const hv = R.ghost ? null : R.hover, sv = R.sel;
+  const mark_ = (o, ent) => { ent.o = o; if (sv && sv.obj === o) outl.push({ ...ent, sel: true }); else if (hv && hv.obj === o) outl.push(ent); };
   const lights = [], c = dyn.b;
   for (const b of G.bMap.values()) {
     const def = BDEF[b.t];
@@ -121,7 +124,11 @@ export function renderWorld(ctx, t, dt) {
         const age = nowS() - b.pop;
         if (age < 0.5) { const k = easeOutBack(Math.min(1, age / .45)); sy *= Math.max(.05, k); sxz *= .8 + .2 * k; } else delete b.pop;
       }
-      if (!hide) inst.add(bldModel(b, def, o), b.x, b.y, sy, sxz, b.w / 2, b.d / 2, lift);
+      if (!hide) {
+        const m = bldModel(b, def, o);
+        inst.add(m, b.x, b.y, sy, sxz, b.w / 2, b.d / 2, lift);
+        mark_(b, { model: m, x: b.x, y: b.y, sy, sxz, px: b.w / 2, pz: b.d / 2, lift });
+      }
     }
     c.setRot(0); c.ox = c.oy = c.oz = 0;
     if (b.bld) buildConstruction(c, b, def, !!def.draw && !def.terraform);
@@ -133,7 +140,9 @@ export function renderWorld(ctx, t, dt) {
     const def = NDEF[n.t];
     let dx = 0;
     if (n.shk && nowS() - n.shk < .45) dx = Math.sin(nowS() * 60) * .05 * (1 - (nowS() - n.shk) / .45);
-    inst.add(nodeModel(n, def, o), n.x + dx, n.y);
+    const m = nodeModel(n, def, o);
+    inst.add(m, n.x + dx, n.y);
+    mark_(n, { model: m, x: n.x + dx, y: n.y, sy: 1, sxz: 1, px: 0, pz: 0, lift: 0 });
   }
   const pl = G.player || G.player;
   if (G.scene === 'world') buildPlayer(c, pl, t, entityPose(pl, o, true, t));
@@ -155,6 +164,8 @@ export function renderWorld(ctx, t, dt) {
 
   dyn.flush(); inst.end();
   renderer.render(scene, camera3);
+  setOutline(outl); renderOutline(t);
+  R.outlined = new Set(outl.map((e) => e.o));
   p0 = mark('r.gl', p0);
 
   // ── 2D-оверлей ──
@@ -215,7 +226,7 @@ function drawOverlays(c, o, t) {
   }
   // выделение
   const sel = R.sel;
-  if (sel) { const a = .55 + .25 * Math.sin(t * 5); dia(c, sel.x, sel.y, sel.w || 1, sel.d || 1, `rgba(255,236,160,${a * .25})`, `rgba(255,226,120,${a})`, 2.2, 1); }
+  if (sel && !(sel.obj && R.outlined.has(sel.obj))) { const a = .55 + .25 * Math.sin(t * 5); dia(c, sel.x, sel.y, sel.w || 1, sel.d || 1, `rgba(255,236,160,${a * .25})`, `rgba(255,226,120,${a})`, 2.2, 1); }
   // приказ, отданный на паузе: путь и цель
   const pp = G.player.path;
   if (!G.speed && pp && pp.length && !G.player.sleeping) {
@@ -226,7 +237,7 @@ function drawOverlays(c, o, t) {
     c.stroke(); c.restore();
     dia(c, last.x, last.y, 1, 1, `rgba(255,236,160,${a * .3})`, `rgba(255,226,120,${a})`, 2.2, 1);
   }
-  if (R.hover && !R.ghost) dia(c, R.hover.x, R.hover.y, R.hover.w || 1, R.hover.d || 1, 'rgba(255,255,255,.14)', 'rgba(255,255,255,.55)', 1.5, 1);
+  if (R.hover && !R.ghost && !(R.hover.obj && R.outlined.has(R.hover.obj))) dia(c, R.hover.x, R.hover.y, R.hover.w || 1, R.hover.d || 1, 'rgba(255,255,255,.14)', 'rgba(255,255,255,.55)', 1.5, 1);
   // сетка и клетки под призраком
   const g = R.ghost;
   if (g) {

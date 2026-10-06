@@ -42,6 +42,7 @@ export function getModel(key, w, d, h, fn) {
   if (b.lit.n) parts.push({ geo: geoFrom(b.lit), mat: MAT.lit });
   if (b.emi.n) parts.push({ geo: geoFrom(b.emi), mat: MAT.emi });
   if (b.tr.n) parts.push({ geo: geoFrom(b.tr), mat: MAT.tr, order: 1 });
+  if (b.shd.n) parts.push({ geo: geoFrom(b.shd), mat: MAT.tr, order: 1, shd: true });
   for (const dc of b.decals) { const p = decalPart(dc); p.order = 1; parts.push(p); }
   m = { key, parts, h };
   cache.set(key, m);
