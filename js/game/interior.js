@@ -21,6 +21,7 @@ import { buildPlayer, buildPet, drawWorkRing, drawPetBubble, drawZ } from '../re
 import { drawLighting } from '../render/lighting.js';
 import { drawWeather } from '../render/weather.js';
 import { R, roots, showGhost, hideGhosts, dia } from '../render/scene.js';
+import { setOutline, renderOutline } from '../render/outline.js';
 import { updateStation } from './sim.js';
 
 S.furnDef = (id) => FDEF[id];
@@ -359,6 +360,7 @@ export function renderInterior(ctx, t, dt) {
   roomInst.begin(); const c = roomDyn.b; c.reset(); c.setRot(0); c.ox = c.oy = c.oz = 0;
   roomInst.add(roomModel(home), 0, 0);
   const lights = [], frame = roots.frame;
+  const outl = []; const hv = R.ghost ? null : R.hover, selUid = G.sel?.uid;
   for (const it of home.in.items) {
     const d = FDEF[it.t];
     if (d.wall) {
@@ -369,7 +371,11 @@ export function renderInterior(ctx, t, dt) {
     }
     let sy = 1, sxz = 1;
     if (it.pop !== undefined) { const age = performance.now() / 1000 - it.pop; if (age < .45) { const k = Math.min(1, age / .4), e = 1 + 1.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2); sy = Math.max(.05, e); sxz = .85 + .15 * e; } else delete it.pop; }
-    roomInst.add(furnModel(it, d, o), it.x, it.y, sy, sxz, it.w / 2, it.d / 2);
+    const fm = furnModel(it, d, o);
+    roomInst.add(fm, it.x, it.y, sy, sxz, it.w / 2, it.d / 2);
+    const oe = { model: fm, x: it.x, y: it.y, sy, sxz, px: it.w / 2, pz: it.d / 2, lift: 0 };
+    if (hv && hv.obj === it && selUid !== it.uid) outl.push(oe);
+    if (selUid && selUid === it.uid) outl.push({ ...oe, sel: true });
     if (d.anim) { c.ox = it.x; c.oy = it.y; setSwap(!!it.rot); try { d.anim(c, { ...it, st: it.st, cw: d.size[0], cd: d.size[1], on: it.on }, t, o); } catch (err) { /* анимация */ } setSwap(false); c.ox = c.oy = 0; }
     if (d.light && lightOnIt(home, it, d)) lights.push({ x: it.x + it.w / 2, y: it.y + it.d / 2, z: 40, r: d.light.r, col: d.light.col, f: 1 + Math.sin(t * 9 + it.uid) * .03 });
   }
@@ -386,6 +392,7 @@ export function renderInterior(ctx, t, dt) {
   hideGhosts(roots.room);
   roomDyn.flush(); roomInst.end();
   renderer.render(scene, camera3);
+  setOutline(outl); renderOutline(t);
 
   // ── 2D-оверлей ──
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cam.W * dpr, cam.H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -394,7 +401,7 @@ export function renderInterior(ctx, t, dt) {
   ctx.fillStyle = 'rgba(255,240,210,.9)'; ctx.font = `600 ${11 * zk}px ui-rounded, sans-serif`; ctx.textAlign = 'center';
   const [dx, dy] = worldToScreen(door.x + .5, door.y + .5, 1); ctx.fillText('выход', dx, dy + 4 * zk);
   const sel = G.sel;
-  if (sel && sel.uid) { const it = home.in.items.find((o2) => o2.uid === sel.uid); if (it && !it.wall) { const a = .55 + .25 * Math.sin(t * 5); dia(ctx, it.x, it.y, it.w, it.d, `rgba(255,236,160,${a * .25})`, `rgba(255,226,120,${a})`, 2.2, 1); } }
+  if (sel && sel.uid) { const it = home.in.items.find((o2) => o2.uid === sel.uid); if (it && !it.wall && !outl.some((e) => e.sel)) { const a = .55 + .25 * Math.sin(t * 5); dia(ctx, it.x, it.y, it.w, it.d, `rgba(255,236,160,${a * .25})`, `rgba(255,226,120,${a})`, 2.2, 1); } }
   if (gh && gh.kind === 'furn') drawGhost2D(ctx, gh, WH);
   if (R.hover && !R.ghost && R.hover.kind === 'tile') dia(ctx, R.hover.x, R.hover.y, 1, 1, 'rgba(255,255,255,.12)', 'rgba(255,255,255,.4)', 1.2, 1);
   drawWorkRing(ctx, p);

@@ -22,7 +22,7 @@ import { sfx } from '../core/audio.js';
 let root, sigLast = '', acc = 0;
 export function initPanel() { root = $('#panel'); }
 
-export function selectBuilding(b) { focusUpper(b.x + b.w / 2, b.y + b.d / 2); UI.sel = { kind: 'bld', id: b.id }; G.sel = null; R.sel = { x: b.x, y: b.y, w: b.w, d: b.d }; R.links = linksOf(b); sigLast = ''; renderPanel(); sfx('ui'); }
+export function selectBuilding(b) { focusUpper(b.x + b.w / 2, b.y + b.d / 2); UI.sel = { kind: 'bld', id: b.id }; G.sel = null; R.sel = { x: b.x, y: b.y, w: b.w, d: b.d, obj: b }; R.links = linksOf(b); sigLast = ''; renderPanel(); sfx('ui'); }
 export function selectWater(x, y) { focusUpper(x + .5, y + .5, 0); UI.sel = { kind: 'water', x, y }; G.sel = null; R.sel = { x, y, w: 1, d: 1 }; R.links = []; sigLast = ''; renderPanel(); }
 export function selectFurn(it) { UI.sel = { kind: 'furn', uid: it.uid }; G.sel = { uid: it.uid }; R.sel = null; sigLast = ''; renderPanel(); sfx('ui'); }
 export function clearSelection() { UI.sel = null; G.sel = null; R.sel = null; R.links = []; sigLast = ''; root.style.display = 'none'; }

@@ -5,8 +5,8 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #4a9fbd; font-family: var(--font); color: var(--ink); -webkit-user-select: none; user-select: none; }
-canvas#game, canvas#overlay { position: fixed; inset: 0; display: block; touch-action: none; }
-canvas#overlay { pointer-events: none; }
+canvas#game, canvas#overlay, canvas#outline { position: fixed; inset: 0; display: block; touch-action: none; }
+canvas#overlay, canvas#outline { pointer-events: none; }
 #ui { position: fixed; inset: 0; pointer-events: none; }
 #ui > * { pointer-events: auto; }
 button { font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--paper2); border-radius: 12px; padding: 6px 12px; transition: transform .08s, background .15s, box-shadow .15s; }
