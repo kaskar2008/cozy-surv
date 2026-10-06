@@ -60,7 +60,12 @@ function drawBush(c, n, o) {
   if (s === 3) snowCap(c, 0, 20, 12, 5);
   if (n.st === 'full' && s !== 3) {
     const bc = n.v % 2 ? '#4a5bd0' : '#d6384c';
-    for (const [dx, dz] of [[-12, 8], [-2, 18], [10, 12], [14, 6], [-6, 4], [4, 6]]) blob(c, .54 + dx / 64, .54 - dx / 64, dz, 2.8, 2.8, bc);
+    // ягоды сидят на поверхности куста со всех сторон (внутри листвы их не видно)
+    for (let i = 0; i < 16; i++) {
+      const a = i * 2.4 + n.v, z = 6 + ((i * 5) % 5) * 3.2, r = z > 13 ? .35 : .45;
+      blob(c, .5 + Math.cos(a) * r, .5 + Math.sin(a) * r, z, 4, 4, bc);
+      blob(c, .5 + Math.cos(a) * (r + .02), .5 + Math.sin(a) * (r + .02), z + 1.4, 1.1, 1.1, 'rgba(255,255,255,.7)');
+    }
   }
 }
 function drawRock(c, n, o, big) {
