@@ -6,7 +6,9 @@ import * as cloud from './game/cloud.js';
 import { cam, centerOn } from './render/camera.js';
 import { renderWorld, initScene, R } from './render/scene.js';
 import { resizeGL } from './render/gl.js';
-import { renderInterior } from './game/interior.js';
+import { renderInterior, enterHome, exitHome, placeFurn } from './game/interior.js';
+import { FDEF } from './data/furniture.js';
+import { worldToScreen, screenToWorld, rotateCam } from './render/camera.js';
 import { simulate } from './game/sim.js';
 import { ensureLinks } from './game/nets.js';
 import { computeCozy } from './game/cozy.js';
@@ -103,7 +105,7 @@ async function boot() {
     const intro = () => openIntro(() => { delete G.noSave; setSpeed(1); save(); });
     picker ? chooseStorage(intro) : intro();
   }
-  window.cozy = { quality: () => quality, G, S, api, BDEF, cam, R, UI, save, load, prof, syncProf: (on) => { hooks.sync = on ? () => ctx.getImageData(0, 0, 1, 1) : null; } };
+  window.cozy = { enterHome, exitHome, placeFurn, FDEF, worldToScreen, screenToWorld, rotateCam, quality: () => quality, G, S, api, BDEF, cam, R, UI, save, load, prof, syncProf: (on) => { hooks.sync = on ? () => ctx.getImageData(0, 0, 1, 1) : null; } };
   requestAnimationFrame(frame);
 }
 boot();

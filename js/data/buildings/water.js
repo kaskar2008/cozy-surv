@@ -1,12 +1,12 @@
 import { reg } from './registry.js';
 import { conduit } from './common.js';
-import { P, box, cyl, blob, shadow, line3, poly, plane, gable, pyramid, wallRect, lean, flame } from '../../core/iso.js';
+import { P, box, cyl, blob, shadow, line3, poly, plane, gable, pyramid, wallRect, lean, flame, curve3, ribbon, glow } from '../../core/iso.js';
 import { shade } from '../../core/util.js';
 
 const gauge = (c, b, cap, x = -14) => {
-  const f = Math.min(1, (b.st.water || 0) / cap), [X, Y] = P(.5, .5, 0);
-  c.fillStyle = 'rgba(30,40,50,.55)'; c.fillRect(X + x, Y - 32, 4, 28);
-  c.fillStyle = '#7ad0f2'; c.fillRect(X + x, Y - 4 - 28 * f, 4, 28 * f);
+  const f = Math.min(1, (b.st.water || 0) / cap), gx = .5 + x / 64 * 1.15, gy = .5 - x / 64 * 1.15;
+  box(c, gx - .04, gy - .04, 4, .08, .08, 28, 'rgba(30,40,50,.55)');
+  if (f > .02) box(c, gx - .045, gy - .045, 4, .09, .09, 28 * f, '#7ad0f2');
 };
 
 reg([
@@ -37,7 +37,7 @@ reg([
       for (const [k, col] of [[0, '#d9c28a'], [1, '#3a3a40'], [2, '#a2a5ac']]) box(c, 1.25, 1.2 + k * .0, k * 7, .5, .5, 7, col, { top: shade(col, .05) });
     },
     anim(c, b, t, o) {
-      if (o.raining) { c.fillStyle = 'rgba(160,215,245,.9)'; for (let i = 0; i < 5; i++) { const k = (t * 1.6 + i * .2) % 1, [x, y] = P(.1 + i * .38, .1 + (i % 2) * .6, 46 - k * 40); c.fillRect(x, y, 1.4, 4); } }
+      if (o.raining) for (let i = 0; i < 5; i++) { const k = (t * 1.6 + i * .2) % 1, x = .1 + i * .38, y = .1 + (i % 2) * .6, z = 46 - k * 40; line3(c, [x, y, z], [x, y, z - 5], 'rgba(160,215,245,.9)', 1.4); }
     },
   },
   {
@@ -52,7 +52,7 @@ reg([
     desc: 'Каменная цистерна на 160 единиц воды — запас на всю зиму.',
     tags: ['water', 'tank'], net: { water: { cap: 160 } }, drink: true,
     draw(c) { shadow(c, 1, 1, .95, .22); cyl(c, 1, 1, 0, .82, 34, '#9ea1a8', { rings: [.5], ringCol: '#7c7e86', top: '#7aa7be' }); plane(c, 34, (g) => { g.fillStyle = '#5f8ea8'; g.beginPath(); g.ellipse(1, 1, .55, .55, 0, 0, 7); g.fill(); g.fillStyle = '#3a3a40'; g.beginPath(); g.ellipse(1, 1, .18, .18, 0, 0, 7); g.fill(); }); },
-    anim(c, b) { const f = Math.min(1, (b.st.water || 0) / 160), [X, Y] = P(1, 1, 34); c.fillStyle = `rgba(110,200,240,${.25 + .5 * f})`; c.beginPath(); c.ellipse(X, Y, 20 * f + 4, 10 * f + 2, 0, 0, 7); c.fill(); },
+    anim(c, b) { const f = Math.min(1, (b.st.water || 0) / 160); cyl(c, 1, 1, 34, (20 * f + 4) / 45.25, .6, `rgba(110,200,240,${(.25 + .5 * f).toFixed(3)})`); },
   },
   {
     id: 'pipe', name: 'Труба', cat: 'water', icon: '➰', cost: { reeds: 2 }, req: ['tank'], flat: true, walk: true, drag: true, norot: true, h: 8,
@@ -65,7 +65,7 @@ reg([
     desc: 'Сам поливает грядки в радиусе 3 клеток. Подключи к сети труб с водой — и забудь про лейку.',
     tags: ['water'], net: { water: { cap: 1 } }, radius: 3,
     draw(c) { shadow(c, .5, .5, .16, .14); cyl(c, .5, .5, 0, .06, 18, '#6b7f8a'); cyl(c, .5, .5, 16, .12, 5, '#8aa3b5', { top: '#b9ccd8' }); },
-    anim(c, b, t) { if (b.st.on > 0) { const [x, y] = P(.5, .5, 22); c.strokeStyle = 'rgba(150,215,245,.8)'; c.lineWidth = 1.4; for (let i = 0; i < 6; i++) { const a = i * 1.0472 + t * 1.5; c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + Math.cos(a) * 14, y - 16, x + Math.cos(a) * 26, y + Math.sin(a) * 9 + 6); c.stroke(); } } },
+    anim(c, b, t) { if (b.st.on > 0) for (let i = 0; i < 6; i++) { const a = i * 1.0472 + t * 1.5, ca = Math.cos(a), sa = Math.sin(a); curve3(c, [.5, .5, 22], [.5 + ca * .3, .5 + sa * .3, 56], [.5 + ca * .57, .5 + sa * .57, 2], 'rgba(150,215,245,.8)', 1.4, 7); } },
   },
   {
     id: 'river_pump', name: 'Насос у воды', cat: 'water', icon: '🚰', cost: { scrap: 6, nails: 4, planks: 4 }, req: ['solar_panel'], shore: true, h: 56, cozy: 1,
@@ -76,7 +76,7 @@ reg([
       box(c, .2, .2, 0, .6, .6, 16, '#6b7f8a'); box(c, .28, .28, 16, .44, .44, 8, '#4f5f6a');
       cyl(c, .5, .5, 24, .08, 20, '#8aa3b5'); box(c, .35, .35, 44, .3, .3, 4, '#c9573f');
     },
-    anim(c, b, t) { const [x, y] = P(.5, .5, 44 + (b.st.on ? Math.sin(t * 8) * 3 : 0)); c.fillStyle = '#b9ccd8'; c.fillRect(x - 3, y - 4, 6, 4); if (b.st.on) { c.fillStyle = '#7ad0f2'; c.beginPath(); c.arc(x + 12, y + 12 + Math.sin(t * 4) * 2, 2, 0, 7); c.fill(); } },
+    anim(c, b, t) { box(c, .43, .46, 44 + (b.st.on ? Math.sin(t * 8) * 3 : 0), .14, .08, 5, '#b9ccd8'); if (b.st.on) blob(c, .5 + .2, .5 - .2, 30 + Math.sin(t * 4) * 2, 2, 2.6, '#7ad0f2'); },
   },
   {
     id: 'trough', name: 'Поилка', cat: 'water', icon: '🥣', cost: { planks: 3 }, req: ['tank'], h: 24, cozy: 1,
@@ -111,10 +111,9 @@ reg([
       box(c, 1.6, 1.7, 0, .5, .35, 8, '#8b5e3c', { tex: 'planks' });
     },
     anim(c, b, t) {
-      const [X, Y] = P(1, 1, 22), full = !!b.st.full, hot = b.st.hot;
-      c.fillStyle = full ? (hot ? '#8fd6e8' : '#6cb8d6') : '#4a3a30';
-      c.beginPath(); c.ellipse(X, Y, 33, 16.5, 0, 0, 7); c.fill();
-      if (full && hot) { c.fillStyle = 'rgba(255,255,255,.4)'; for (let i = 0; i < 3; i++) { const k = (t * .5 + i / 3) % 1; c.globalAlpha = (1 - k) * .8; c.beginPath(); c.arc(X + (i - 1) * 14, Y - k * 26, 5 + k * 4, 0, 7); c.fill(); } c.globalAlpha = 1; }
+      const full = !!b.st.full, hot = b.st.hot;
+      cyl(c, 1, 1, 22, .78, .6, full ? (hot ? '#8fd6e8' : '#6cb8d6') : '#4a3a30');
+      if (full && hot) for (let i = 0; i < 3; i++) { const k = (t * .5 + i / 3) % 1, dx = (i - 1) * 14; blob(c, 1 + dx / 64, 1 - dx / 64, 22 + k * 26, 5 + k * 4, 5 + k * 4, `rgba(255,255,255,${(.4 * (1 - k) * .8).toFixed(3)})`); }
     },
   },
   {
@@ -128,9 +127,8 @@ reg([
     },
     anim(c, b, t) {
       if (!b.st.on) return;
-      const [X, Y] = P(1, 1, 56); c.strokeStyle = 'rgba(190,235,255,.85)'; c.lineWidth = 1.5; c.lineCap = 'round';
-      for (let i = 0; i < 8; i++) { const a = i * .785 + t * .6, r = 16 + Math.sin(t * 3 + i) * 3; c.beginPath(); c.moveTo(X, Y); c.quadraticCurveTo(X + Math.cos(a) * r * .6, Y - 10, X + Math.cos(a) * r, Y + 14 + Math.sin(a) * 6); c.stroke(); }
-      const [X2, Y2] = P(1, 1, 14); c.strokeStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(X2, Y2, 30 + Math.sin(t * 3) * 3, 15, 0, 0, 7); c.stroke();
+      for (let i = 0; i < 8; i++) { const a = i * .785 + t * .6, r = (16 + Math.sin(t * 3 + i) * 3) / 45.25 * 1.4, ca = Math.cos(a), sa = Math.sin(a); curve3(c, [1, 1, 56], [1 + ca * r * .6, 1 + sa * r * .6, 78], [1 + ca * r, 1 + sa * r, 36], 'rgba(190,235,255,.85)', 1.6, 7); }
+      cyl(c, 1, 1, 14.5, (30 + Math.sin(t * 3) * 3) / 45.25 * 1.3, .4, 'rgba(255,255,255,.22)');
     },
   },
   {
@@ -153,6 +151,6 @@ reg([
     desc: 'Плетёная корзина на мелководье: сама ловит рыбу, пока ты занят другими делами. Поставь рядом ящик — рыба будет складываться в него.',
     tags: ['producer'], out: { item: 'fish', every: 190, max: 5, label: 'рыба' },
     draw(c) { cyl(c, .5, .5, -3, .22, 24, '#b79054', { rings: [.25, .55, .85], ringCol: '#7a5a2e', top: '#6a4a24' }); },
-    anim(c, b, t) { const [X, Y] = P(.5, .5, -1); c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1.2; c.beginPath(); c.ellipse(X, Y, 18 + Math.sin(t * 2) * 2, 9, 0, 0, 7); c.stroke(); },
+    anim(c, b, t) { cyl(c, .5, .5, -2, (18 + Math.sin(t * 2) * 2) / 45.25, .5, 'rgba(255,255,255,.28)'); },
   },
 ]);

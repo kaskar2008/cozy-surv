@@ -1,9 +1,9 @@
 import { reg } from './registry.js';
-import { P, box, cyl, cone, blob, shadow, line3, poly, plane, gable, pyramid, wallRect, lean } from '../../core/iso.js';
+import { P, box, cyl, cone, blob, shadow, line3, poly, plane, gable, pyramid, wallRect, lean, curve3, ribbon, glow } from '../../core/iso.js';
 import { shade } from '../../core/util.js';
 
 const WIN = '#bfe6f2', WOOD = '#6b4328';
-function windowGlow(c, side, pos, u0, u1, z0, z1) { wallRect(c, side, pos, u0, u1, z0, z1, '#ffd27a'); }
+function windowGlow(c, side, pos, u0, u1, z0, z1) { wallRect(c, side, pos + .03, u0, u1, z0, z1, '#ffd27a'); }
 
 reg([
   {

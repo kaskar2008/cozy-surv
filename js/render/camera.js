@@ -37,7 +37,10 @@ export function zoomAt(px, py, f) {
 }
 // поворот на 90° (dir = ±1), плавно; в интерьере не используется
 export function rotateCam(dir) { cam.azT += dir * Math.PI / 2; }
-export function updateCam(dt) {
+let lastT = 0;
+// анимация поворота идёт по реальному времени (на паузе игровое время стоит, а камера должна вращаться)
+export function updateCam() {
+  const now = performance.now(), dt = Math.min(.1, (now - (lastT || now)) / 1000); lastT = now;
   if (Math.abs(cam.azT - cam.az) > 1e-4) {
     const k = 1 - Math.exp(-dt * 9);
     cam.az += (cam.azT - cam.az) * k;

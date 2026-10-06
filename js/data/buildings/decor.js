@@ -1,5 +1,5 @@
 import { reg } from './registry.js';
-import { P, box, cyl, cone, blob, shadow, line3, poly, plane, gable, pyramid, wallRect, lean, flame } from '../../core/iso.js';
+import { P, box, cyl, cone, blob, shadow, line3, poly, plane, gable, pyramid, wallRect, lean, flame, curve3, ribbon, glow } from '../../core/iso.js';
 import { shade, hash2 } from '../../core/util.js';
 
 const pathBase = (c, b, col, spots, round = .16) => plane(c, 0, (g) => {
@@ -84,29 +84,34 @@ reg([
     id: 'birdhouse', name: 'Скворечник', cat: 'decor', icon: '🐦', cost: { planks: 2, sticks: 3 }, req: ['workbench'], h: 80, cozy: 3,
     desc: 'Сюда прилетают птицы — щебечут и радуют.',
     draw(c) { shadow(c, .5, .5, .14, .14); cyl(c, .5, .5, 0, .04, 46, '#7b5535'); box(c, .32, .32, 46, .36, .36, 18, '#e0b87a', { tex: 'planks' }); pyramid(c, .26, .26, 64, .48, .48, 12, .04, '#b0603c'); wallRect(c, 'L', .68, .44, .56, 50, 58, '#2a1a10'); },
-    anim(c, b, t) { const k = (t * .12 + b.v * .13) % 1; if (k < .35) { const [x, y] = P(.5, .5, 70 + Math.sin(k * 20) * 3); c.fillStyle = '#6b8fd0'; c.beginPath(); c.ellipse(x + 10, y, 4.5, 3, 0, 0, 7); c.fill(); c.fillStyle = '#e8c860'; c.fillRect(x + 14, y - 1, 3, 1.4); } },
+    anim(c, b, t) { const k = (t * .12 + b.v * .13) % 1; if (k < .35) { const z = 70 + Math.sin(k * 20) * 3; blob(c, .5 + 10 / 64, .5 - 10 / 64, z, 4.5, 3, '#6b8fd0'); blob(c, .5 + 15 / 64, .5 - 15 / 64, z, 2, 1.4, '#e8c860'); } },
   },
   {
     id: 'windchime', name: 'Ветряные колокольчики', cat: 'decor', icon: '🎐', cost: { shell: 3, rope: 1, sticks: 2 }, h: 80, cozy: 3,
     desc: 'Ракушки на ниточках тихо звенят на ветру.',
     draw(c) { shadow(c, .5, .5, .12, .14); cyl(c, .5, .5, 0, .035, 50, '#7b5535'); line3(c, [.5, .5, 50], [.78, .5, 46], '#7b5535', 2.4); },
-    anim(c, b, t) { const sw = Math.sin(t * 1.7 + b.v) * 3; const [x, y] = P(.78, .5, 46); for (let i = 0; i < 4; i++) { const dx = (i - 1.5) * 4 + sw, L = 10 + (i % 2) * 6; c.strokeStyle = '#e8e0d0'; c.lineWidth = .8; c.beginPath(); c.moveTo(x + (i - 1.5) * 3, y); c.lineTo(x + dx, y + L); c.stroke(); c.fillStyle = ['#f3c6c0', '#f0e0c8', '#d6c8f0', '#c8e6f0'][i]; c.beginPath(); c.ellipse(x + dx, y + L + 2, 2.6, 3.4, 0, 0, 7); c.fill(); } },
+    anim(c, b, t) { const sw = Math.sin(t * 1.7 + b.v) * 3; for (let i = 0; i < 4; i++) { const t0 = (i - 1.5) * 3, dx = (i - 1.5) * 4 + sw, L = 10 + (i % 2) * 6; line3(c, [.78 + t0 / 64, .5 - t0 / 64, 46], [.78 + dx / 64, .5 - dx / 64, 46 - L], '#e8e0d0', 1); blob(c, .78 + dx / 64, .5 - dx / 64, 46 - L - 2, 2.6, 3.4, ['#f3c6c0', '#f0e0c8', '#d6c8f0', '#c8e6f0'][i]); } },
   },
   {
     id: 'pinwheel', name: 'Вертушка', cat: 'decor', icon: '🎡', cost: { sticks: 2, cloth: 1 }, h: 60, cozy: 2, drag: true,
     desc: 'Яркая вертушка крутится на ветру.',
     draw(c) { shadow(c, .5, .5, .1, .12); cyl(c, .5, .5, 0, .025, 34, '#7b5535'); },
-    anim(c, b, t) { const [x, y] = P(.5, .5, 38); c.save(); c.translate(x, y); c.rotate(t * 2.2 + b.v); const cols = ['#e8584a', '#f5d34a', '#4a9ae8', '#6fc47a']; for (let i = 0; i < 4; i++) { c.rotate(Math.PI / 2); c.fillStyle = cols[i]; c.beginPath(); c.moveTo(0, 0); c.lineTo(10, 0); c.lineTo(10, -9); c.closePath(); c.fill(); } c.restore(); c.fillStyle = '#fff'; c.beginPath(); c.arc(x, y, 1.6, 0, 7); c.fill(); },
+    anim(c, b, t) {
+      const K = 1 / 45.25 * Math.SQRT1_2, cols = ['#e8584a', '#f5d34a', '#4a9ae8', '#6fc47a'], th0 = t * 2.2 + b.v;
+      const pt = (u, v, th) => P(.5 + (u * Math.cos(th) - v * Math.sin(th)) * K, .5 - (u * Math.cos(th) - v * Math.sin(th)) * K, 38 + u * Math.sin(th) + v * Math.cos(th));
+      for (let i = 0; i < 4; i++) { const th = th0 + i * Math.PI / 2; poly(c, [pt(0, 0, th), pt(10, 0, th), pt(10, 9, th)], cols[i]); }
+      blob(c, .5 + .06, .5 - .06, 38, 1.8, 1.8, '#ffffff');
+    },
   },
   {
     id: 'statue', name: 'Каменный кот', cat: 'decor', icon: '🗿', cost: { stone: 20, clay: 2 }, req: ['workbench'], h: 70, cozy: 5,
     desc: 'Статуя довольного кота на постаменте. Приносит удачу (и немного уюта).',
-    draw(c) { shadow(c, .5, .5, .3, .16); box(c, .24, .24, 0, .52, .52, 12, '#a2a5ac', { tex: 'stone' }); blob(c, .5, .5, 22, 13, 11, '#bfc1c6'); blob(c, .5, .5, 36, 9, 8, '#c9cbd0'); poly(c, [P(.4, .5, 42), P(.44, .5, 50), P(.5, .5, 43)], '#c9cbd0'); poly(c, [P(.6, .5, 42), P(.56, .5, 50), P(.5, .5, 43)], '#c9cbd0'); const [x, y] = P(.5, .62, 37); c.fillStyle = '#3a3a40'; c.fillRect(x - 4, y - 1, 1.6, 1.6); c.fillRect(x + 2.4, y - 1, 1.6, 1.6); },
+    draw(c) { shadow(c, .5, .5, .3, .16); box(c, .24, .24, 0, .52, .52, 12, '#a2a5ac', { tex: 'stone' }); blob(c, .5, .5, 22, 13, 11, '#bfc1c6'); blob(c, .5, .5, 36, 9, 8, '#c9cbd0'); poly(c, [P(.4, .5, 42), P(.44, .5, 50), P(.5, .5, 43)], '#c9cbd0'); poly(c, [P(.6, .5, 42), P(.56, .5, 50), P(.5, .5, 43)], '#c9cbd0'); blob(c, .453, .667, 37, 1.5, 1.5, '#3a3a40'); blob(c, .547, .573, 37, 1.5, 1.5, '#3a3a40'); },
   },
   {
     id: 'gnome', name: 'Садовый гном', cat: 'decor', icon: '🧙', cost: { clay: 4, cloth: 1 }, h: 50, cozy: 3,
     desc: 'Глиняный гном с хитрой улыбкой. Охраняет сад — по крайней мере, он так считает.',
-    draw(c) { shadow(c, .5, .5, .16, .14); cyl(c, .5, .5, 0, .13, 16, '#3f6fb0'); blob(c, .5, .5, 20, 8, 8, '#f0d4a0'); blob(c, .5, .55, 14, 8, 6, '#f4f4f4'); cone(c, .5, .5, 24, .12, 20, '#d9402a'); const [x, y] = P(.5, .55, 20); c.fillStyle = '#3a2a22'; c.fillRect(x - 3, y - 2, 1.5, 1.5); c.fillRect(x + 1.6, y - 2, 1.5, 1.5); },
+    draw(c) { shadow(c, .5, .5, .16, .14); cyl(c, .5, .5, 0, .13, 16, '#3f6fb0'); blob(c, .5, .5, 20, 8, 8, '#f0d4a0'); blob(c, .5, .55, 14, 8, 6, '#f4f4f4'); cone(c, .5, .5, 24, .12, 20, '#d9402a'); blob(c, .45, .6, 21, 1.4, 1.4, '#3a2a22'); blob(c, .53, .52, 21, 1.4, 1.4, '#3a2a22'); },
   },
   {
     id: 'arch', name: 'Арка с цветами', cat: 'decor', icon: '🌹', cost: { planks: 6, rope: 2, flowers: 3 }, req: ['workbench'], walk: true, h: 90, cozy: 5,
@@ -116,14 +121,14 @@ reg([
       for (const y of [.12, .88]) { box(c, .44, y - .05, 0, .1, .1, 64, '#c9a578'); }
       for (let i = 0; i < 6; i++) { const t = i / 5, y = .12 + .76 * t, z = 62 + Math.sin(t * Math.PI) * 14; line3(c, [.5, y - .08, z - 4], [.5, y + .08, z], '#c9a578', 3); }
       const cols = ['#f08ac0', '#f5d34a', '#ffffff', '#e8584a'];
-      for (let i = 0; i < 14; i++) { const t = (i + .5) / 14, y = .12 + .76 * t, z = 62 + Math.sin(t * Math.PI) * 14 + (i % 3) * 3 - 3; blob(c, .5, y, z, 5, 4, '#6aa655'); if (o.season < 3) { c.fillStyle = cols[i % 4]; const [x, yy] = P(.5, y, z + 3); c.beginPath(); c.arc(x, yy, 2.4, 0, 7); c.fill(); } }
+      for (let i = 0; i < 14; i++) { const t = (i + .5) / 14, y = .12 + .76 * t, z = 62 + Math.sin(t * Math.PI) * 14 + (i % 3) * 3 - 3; blob(c, .5, y, z, 5, 4, '#6aa655'); if (o.season < 3) blob(c, .53, y, z + 3, 2.6, 2.6, cols[i % 4]); }
     },
     key: (b, o) => o.season,
   },
   {
     id: 'signpost', name: 'Указатель', cat: 'decor', icon: '🪧', cost: { planks: 2, nails: 1 }, req: ['workbench'], h: 70, cozy: 1,
     desc: 'Деревянные стрелки в никуда — и ко всему сразу.',
-    draw(c) { shadow(c, .5, .5, .12, .12); cyl(c, .5, .5, 0, .04, 48, '#7b5535'); for (const [z, dx, col] of [[38, 1, '#c9915f'], [28, -1, '#b98557']]) { const a = P(.5, .5, z), w = 22 * dx; poly(c, [[a[0], a[1] - 5], [a[0] + w, a[1] - 5], [a[0] + w + 5 * dx, a[1] + 1], [a[0] + w, a[1] + 7], [a[0], a[1] + 7]], col, '#6b4328', .8); } },
+    draw(c) { shadow(c, .5, .5, .12, .12); cyl(c, .5, .5, 0, .04, 48, '#7b5535'); const K = 1 / 45.25 * Math.SQRT1_2; for (const [z, dx, col] of [[38, 1, '#c9915f'], [28, -1, '#b98557']]) { const w = 24 * dx; line3(c, [.5, .5, z], [.5 + w * K, .5 - w * K, z], col, 10); } },
   },
   {
     id: 'snowman', name: 'Снеговик', cat: 'decor', icon: '⛄', cost: {}, seasons: [3], h: 76, cozy: 4,
@@ -131,8 +136,8 @@ reg([
     draw(c) {
       shadow(c, .5, .5, .3, .14); blob(c, .5, .5, 11, 15, 11, '#f4f8fa', { lo: '#cfdde3' }); blob(c, .5, .5, 29, 11, 9, '#f4f8fa', { lo: '#cfdde3' }); blob(c, .5, .5, 44, 8, 7, '#f4f8fa', { lo: '#cfdde3' });
       cyl(c, .5, .5, 50, .17, 3, '#2a2a30'); cyl(c, .5, .5, 53, .1, 8, '#2a2a30');
-      const [x, y] = P(.5, .6, 45); c.fillStyle = '#f08a3c'; c.beginPath(); c.moveTo(x, y - 1); c.lineTo(x + 8, y + 2); c.lineTo(x, y + 2); c.fill(); c.fillStyle = '#2a2a30'; c.fillRect(x - 4, y - 3, 1.6, 1.6); c.fillRect(x + 2.5, y - 3, 1.6, 1.6);
-      for (const z of [30, 22]) { const [a, bb] = P(.5, .62, z); c.fillStyle = '#2a2a30'; c.beginPath(); c.arc(a, bb, 1.4, 0, 7); c.fill(); }
+      line3(c, [.56, .56, 45], [.7, .7, 43], '#f08a3c', 3.6); blob(c, .46, .58, 47, 1.5, 1.5, '#2a2a30'); blob(c, .58, .46, 47, 1.5, 1.5, '#2a2a30');
+      for (const z of [30, 22]) blob(c, .6, .6, z, 1.5, 1.5, '#2a2a30');
       line3(c, [.28, .5, 32], [.1, .5, 40], '#6e4a30', 1.8); line3(c, [.72, .5, 32], [.9, .5, 40], '#6e4a30', 1.8);
     },
   },
@@ -160,15 +165,15 @@ reg([
     id: 'paper_lantern', name: 'Бумажный фонарик', cat: 'light', icon: '🎑', cost: { cloth: 2, wood: 2, wax: 1 }, req: ['workbench'], h: 90, cozy: 4, drag: true,
     desc: 'Красный бумажный фонарь на шесте. Мягкий уютный свет.',
     light: { r: 3.8, col: '#ff8a5a', on: 'dusk', flick: .5 },
-    draw(c) { shadow(c, .5, .5, .12, .14); cyl(c, .5, .5, 0, .035, 64, '#7b5535'); line3(c, [.5, .5, 64], [.68, .5, 64], '#7b5535', 2.4); const [x, y] = P(.68, .5, 52); c.fillStyle = '#e8584a'; c.beginPath(); c.ellipse(x, y, 8, 10, 0, 0, 7); c.fill(); c.fillStyle = '#f08a6a'; c.beginPath(); c.ellipse(x - 2, y - 2, 4, 6, 0, 0, 7); c.fill(); c.fillStyle = '#3a2a22'; c.fillRect(x - 4, y - 11, 8, 2); c.fillRect(x - 4, y + 9, 8, 2); },
-    anim(c, b, t, o) { if (o.dusk) { const [x, y] = P(.68, .5, 52); c.fillStyle = `rgba(255,220,140,${.5 + .2 * Math.sin(t * 3)})`; c.beginPath(); c.ellipse(x, y, 6, 8, 0, 0, 7); c.fill(); } },
+    draw(c) { shadow(c, .5, .5, .12, .14); cyl(c, .5, .5, 0, .035, 64, '#7b5535'); line3(c, [.5, .5, 64], [.68, .5, 64], '#7b5535', 2.4); blob(c, .68, .5, 52, 8, 10, '#e8584a'); blob(c, .66, .52, 54, 4, 6, '#f08a6a'); cyl(c, .68, .5, 61, .1, 2, '#3a2a22'); cyl(c, .68, .5, 41, .1, 2, '#3a2a22'); },
+    anim(c, b, t, o) { if (o.dusk) glow(c, .68, .5, 52, 9, `rgba(255,220,140,${(.5 + .2 * Math.sin(t * 3)).toFixed(3)})`); },
   },
   {
     id: 'stone_lantern', name: 'Каменный фонарь', cat: 'light', icon: '⛩️', cost: { stone: 8, wax: 1 }, req: ['workbench'], h: 70, cozy: 4,
     desc: 'Японский каменный фонарь: спокойный, ровный свет и ощущение дзена.',
     light: { r: 3.8, col: '#ffcf80', on: 'dusk', flick: .5 },
     draw(c) { shadow(c, .5, .5, .26, .16); cyl(c, .5, .5, 0, .2, 6, '#a2a5ac'); cyl(c, .5, .5, 6, .08, 14, '#b4b6bd'); box(c, .34, .34, 20, .32, .32, 14, '#c2c4c9'); cyl(c, .5, .5, 34, .3, 5, '#a2a5ac', { top: '#bfc1c6' }); blob(c, .5, .5, 42, 8, 5, '#b4b6bd'); },
-    anim(c, b, t, o) { if (o.dusk) { const [x, y] = P(.5, .66, 27); c.fillStyle = `rgba(255,215,130,${.8 + .15 * Math.sin(t * 3)})`; c.fillRect(x - 5, y - 5, 10, 9); } },
+    anim(c, b, t, o) { if (o.dusk) glow(c, .5, .5, 27, 8, `rgba(255,215,130,${(.8 + .15 * Math.sin(t * 3)).toFixed(3)})`); },
   },
 ]);
 
@@ -181,11 +186,11 @@ reg([
       shadow(c, .5, .5, .34, .12);
       const pts = [[.3, .35, 52], [.68, .3, 60], [.5, .62, 56], [.25, .72, 46], [.75, .7, 50]];
       for (const [x, y, hh] of pts) {
-        const [X, Y] = P(x, y, 0); c.strokeStyle = o.season === 3 ? '#9a8a6a' : '#5da84e'; c.lineWidth = 2.4; c.beginPath(); c.moveTo(X, Y); c.lineTo(X, Y - hh); c.stroke();
-        c.fillStyle = o.season === 3 ? '#8aa07a' : '#6aae56'; c.beginPath(); c.ellipse(X - 5, Y - hh * .45, 5, 2.4, -.5, 0, 7); c.fill();
+        line3(c, [x, y, 0], [x, y, hh], o.season === 3 ? '#9a8a6a' : '#5da84e', 2.6);
+        blob(c, x - 5 / 64, y + 5 / 64, hh * .45, 5, 2.6, o.season === 3 ? '#8aa07a' : '#6aae56');
         if (o.season === 3) continue;
-        c.fillStyle = '#f5c42a'; for (let i = 0; i < 10; i++) { const a = i * .628; c.beginPath(); c.ellipse(X + Math.cos(a) * 6, Y - hh + Math.sin(a) * 6, 3.6, 2, a, 0, 7); c.fill(); }
-        c.fillStyle = '#6a4a2a'; c.beginPath(); c.arc(X, Y - hh, 4.2, 0, 7); c.fill();
+        for (let i = 0; i < 10; i++) { const a = i * .628; blob(c, x + Math.cos(a) * 6 / 64 + .03, y - Math.cos(a) * 6 / 64 + .03, hh - Math.sin(a) * 6, 3.4, 2.6, '#f5c42a'); }
+        blob(c, x + .04, y + .04, hh, 4.2, 4.2, '#6a4a2a');
       }
     },
   },
@@ -196,9 +201,10 @@ reg([
     draw(c, b, o) {
       shadow(c, .5, .5, .38, .1);
       for (const y of [.28, .5, .72]) for (let i = 0; i < 4; i++) {
-        const [X, Y] = P(.18 + i * .22, y, 0); c.strokeStyle = o.season === 3 ? '#a0a08a' : '#7aa860'; c.lineWidth = 1.6; c.beginPath();
-        for (const dx of [-2, 0, 2]) { c.moveTo(X, Y); c.lineTo(X + dx * 1.6, Y - 10); } c.stroke();
-        if (o.season === 3) continue; c.fillStyle = '#9a7ad8'; for (const dx of [-2, 0, 2]) { c.beginPath(); c.ellipse(X + dx * 1.6, Y - 14, 1.6, 4.4, 0, 0, 7); c.fill(); }
+        const X = .18 + i * .22;
+        for (const dx of [-2, 0, 2]) line3(c, [X, y, 0], [X + dx * 1.6 / 64, y - dx * 1.6 / 64, 10], o.season === 3 ? '#a0a08a' : '#7aa860', 1.8);
+        if (o.season === 3) continue;
+        for (const dx of [-2, 0, 2]) blob(c, X + dx * 1.6 / 64, y - dx * 1.6 / 64, 14, 1.8, 4.6, '#9a7ad8');
       }
     },
   },
@@ -217,19 +223,21 @@ reg([
     desc: 'Птички слетаются клевать зёрнышки — особенно зимой. Приятно наблюдать.',
     draw(c) { shadow(c, .5, .5, .14, .12); cyl(c, .5, .5, 0, .04, 42, '#7b5535'); box(c, .3, .3, 42, .4, .4, 3, '#c9915f'); box(c, .3, .3, 45, .4, .04, 4, '#a9774a'); box(c, .3, .66, 45, .4, .04, 4, '#a9774a'); box(c, .35, .35, 45, .3, .3, 1.4, '#e6c45a'); },
     anim(c, b, t) {
-      for (let i = 0; i < 2; i++) { const k = (t * .35 + b.v * .17 + i * .5) % 1, vis = k < .6; if (!vis) continue; const [x, y] = P(.4 + i * .25, .5, 52 + Math.abs(Math.sin(t * 8 + i * 2)) * (k > .5 ? 6 : 1)); c.fillStyle = ['#6b8fd0', '#e8a05a'][i]; c.beginPath(); c.ellipse(x, y, 4.4, 3.2, 0, 0, 7); c.fill(); c.fillStyle = '#e8c860'; c.fillRect(x + 4, y - 1, 2.6, 1.4); c.fillStyle = '#2a1e1e'; c.fillRect(x + 2.4, y - 1.6, 1, 1); }
+      for (let i = 0; i < 2; i++) { const k = (t * .35 + b.v * .17 + i * .5) % 1, vis = k < .6; if (!vis) continue; const x = .4 + i * .25, z = 52 + Math.abs(Math.sin(t * 8 + i * 2)) * (k > .5 ? 6 : 1); blob(c, x, .5, z, 4.4, 3.2, ['#6b8fd0', '#e8a05a'][i]); blob(c, x + 4.6 / 64, .5 - 4.6 / 64, z, 2, 1.4, '#e8c860'); blob(c, x + 2.4 / 64, .5 - 2.4 / 64, z + 1.4, 1, 1, '#2a1e1e'); }
     },
   },
   {
     id: 'rowboat', name: 'Лодка', cat: 'decor', icon: '🛶', size: [2, 1], cost: { planks: 8, nails: 2, rope: 1 }, req: ['workbench'], water: true, shore: true, h: 40, cozy: 4,
     desc: 'Деревянная лодка у берега. Покачивается на воде — выглядит очень умиротворённо.',
     draw(c, b) {
-      const w = b.cw; const a = P(.1, .5, 2), e = P(w - .1, .5, 2);
-      c.fillStyle = '#9a6a44'; c.beginPath(); c.moveTo(a[0] - 4, a[1] - 6); c.quadraticCurveTo((a[0] + e[0]) / 2, a[1] + 26, e[0] + 4, e[1] - 6); c.lineTo(e[0], e[1] - 12); c.quadraticCurveTo((a[0] + e[0]) / 2, a[1] + 8, a[0], a[1] - 12); c.closePath(); c.fill();
-      c.fillStyle = '#7a5233'; c.beginPath(); c.moveTo(a[0], a[1] - 12); c.quadraticCurveTo((a[0] + e[0]) / 2, a[1] + 8, e[0], e[1] - 12); c.lineTo(e[0], e[1] - 8); c.quadraticCurveTo((a[0] + e[0]) / 2, a[1] + 14, a[0], a[1] - 8); c.fill();
+      const w = b.cw;
+      box(c, .22, .24, 1, w - .44, .52, 3, '#7a5233');
+      box(c, .12, .3, 4, w - .24, .06, 10, '#9a6a44'); box(c, .12, .64, 4, w - .24, .06, 10, '#9a6a44');
+      box(c, .1, .3, 4, .06, .4, 10, '#8a5a38'); box(c, w - .16, .3, 4, .06, .4, 10, '#8a5a38');
+      box(c, .5, .3, 9, .12, .4, 2.4, '#b98557'); box(c, w - .8, .3, 9, .12, .4, 2.4, '#b98557');
       line3(c, [.7, .5, 8], [1.5, .6, 26], '#c9a578', 2.4);
     },
-    anim(c, b, t) { const [X, Y] = P(b.cw / 2, .5, -1); c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 1.2; c.beginPath(); c.ellipse(X, Y, 34 + Math.sin(t * 1.5) * 2, 11, 0, 0, 7); c.stroke(); },
+    anim(c, b, t) { cyl(c, b.cw / 2, .5, -2, (34 + Math.sin(t * 1.5) * 2) / 45.25 * 1.2, .5, 'rgba(255,255,255,.28)'); },
   },
 ]);
 function gableLike(c) { poly(c, [P(.22, .26, 60), P(.82, .26, 60), P(.82, .78, 60), P(.22, .78, 60)], '#a5503e', '#8a3e30', 1); poly(c, [P(.22, .78, 60), P(.82, .78, 60), P(.52, .78, 70)], '#8a3e30'); }

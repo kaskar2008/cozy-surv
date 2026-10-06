@@ -1,5 +1,5 @@
 // Ресурсные объекты мира: рисование и правила сбора.
-import { shadow, blob, cyl, cone, line3, poly, P, plane, box } from '../core/iso.js';
+import { shadow, blob, cyl, cone, line3, poly, P, plane, box, curve3, ribbon, glow } from '../core/iso.js';
 import { shade } from '../core/util.js';
 
 const FOL = {
@@ -8,6 +8,8 @@ const FOL = {
   pine: ['#4f9a5b', '#3f8a50', '#4a8550', '#4f8a6a'],
   apple: ['#8bcb64', '#62ad4c', '#d28a3a', '#dfe9ec'],
 };
+// экранный сдвиг по горизонтали dx и вглубь dy (пиксели) -> клетка
+const gp = (dx, dy = 0) => [.5 + dx / 64 + dy / 32, .5 - dx / 64 + dy / 32];
 const snowCap = (c, cx, z, rx, ry) => { c.save(); c.translate(cx, 0); blob(c, 0.5, 0.5, z, rx, ry, '#f4f8fa', { lo: '#cfdde3' }); c.restore(); };
 const vv = (n) => (Math.floor((n.v % 15) / 3) - 2) * 0.025;
 
@@ -30,11 +32,10 @@ function drawTree(c, n, o, kind) {
   }
   const birch = kind === 'birch';
   cyl(c, .5, .5, 0, birch ? .06 : .08, birch ? 30 : 24, birch ? '#e8e2d4' : '#7b5535', birch ? { left: '#f4efe4', right: '#b9b2a0' } : {});
-  if (birch) { c.strokeStyle = '#5a5248'; c.lineWidth = 1.5; for (const z of [6, 12, 20]) { const [x, y] = P(.5, .5, z); c.beginPath(); c.moveTo(x - 2, y); c.lineTo(x + 2, y + 1); c.stroke(); } }
+  if (birch) for (const z of [6, 12, 20]) blob(c, .56, .56, z, 2.6, 1.1, '#5a5248');
   if (s === 3) {
-    const [x, y] = P(.5, .5, birch ? 30 : 24);
-    c.strokeStyle = birch ? '#cfc6b4' : '#6e4c30'; c.lineWidth = 2.2; c.lineCap = 'round';
-    for (const [dx, dy] of [[-16, -22], [14, -26], [-6, -34], [8, -14], [-20, -10], [0, -42]]) { c.beginPath(); c.moveTo(x, y); c.lineTo(x + dx, y + dy); c.stroke(); }
+    const top = birch ? 30 : 24;
+    for (const [dx, dy] of [[-16, -22], [14, -26], [-6, -34], [8, -14], [-20, -10], [0, -42]]) line3(c, [.5, .5, top], [.5 + dx / 64, .5 - dx / 64, top - dy], birch ? '#cfc6b4' : '#6e4c30', 2.4);
     for (const [dx, z] of [[-16, 40], [14, 44], [-6, 52], [0, 62]]) snowCap(c, dx, z - (birch ? 0 : 6), 6, 3);
     return;
   }
@@ -44,8 +45,7 @@ function drawTree(c, n, o, kind) {
     c.save(); c.translate(dx * sc, 0); blob(c, .5, .5, z, rx * sc, ry * sc, shade(col, kk)); c.restore();
   }
   if (kind === 'apple' && n.fruit) {
-    c.fillStyle = '#e04a3a';
-    for (const [dx, dz] of [[-16, 26], [12, 28], [-2, 40], [18, 38], [-10, 44]]) { const [x, y] = P(.5, .5, dz + 4); c.beginPath(); c.arc(x + dx, y, 3.2, 0, 7); c.fill(); }
+    for (const [dx, dz] of [[-16, 26], [12, 28], [-2, 40], [18, 38], [-10, 44]]) blob(c, .52 + dx / 64, .52 - dx / 64, dz + 4, 3.4, 3.4, '#e04a3a');
   }
 }
 
@@ -57,8 +57,7 @@ function drawBush(c, n, o) {
   if (s === 3) snowCap(c, 0, 20, 12, 5);
   if (n.st === 'full' && s !== 3) {
     const bc = n.v % 2 ? '#4a5bd0' : '#d6384c';
-    c.fillStyle = bc;
-    for (const [dx, dz] of [[-12, 8], [-2, 18], [10, 12], [14, 6], [-6, 4], [4, 6]]) { const [x, y] = P(.5, .5, dz); c.beginPath(); c.arc(x + dx, y, 2.6, 0, 7); c.fill(); c.fillStyle = 'rgba(255,255,255,.55)'; c.fillRect(x + dx - 1, y - 1.4, 1.2, 1.2); c.fillStyle = bc; }
+    for (const [dx, dz] of [[-12, 8], [-2, 18], [10, 12], [14, 6], [-6, 4], [4, 6]]) blob(c, .54 + dx / 64, .54 - dx / 64, dz, 2.8, 2.8, bc);
   }
 }
 function drawRock(c, n, o, big) {
@@ -71,47 +70,46 @@ function drawRock(c, n, o, big) {
 }
 function drawFiber(c, n, o) {
   const col = ['#8fcf6a', '#78bd55', '#c2b556', '#bcd0c9'][o.season];
-  if (n.st === 'empty') { c.strokeStyle = shade(col, -.2); c.lineWidth = 1.5; const [x, y] = P(.5, .5, 0); c.beginPath(); c.moveTo(x - 3, y); c.lineTo(x - 4, y - 5); c.moveTo(x + 2, y); c.lineTo(x + 3, y - 4); c.stroke(); return; }
-  c.lineCap = 'round'; c.lineWidth = 2;
-  const [x, y] = P(.5, .5, 0);
-  for (let i = 0; i < 9; i++) { const a = (i - 4) * 0.22, hh = 15 + ((n.v * 7 + i * 5) % 9); c.strokeStyle = shade(col, ((i % 3) - 1) * .08); c.beginPath(); c.moveTo(x + (i - 4) * 2.2, y); c.quadraticCurveTo(x + (i - 4) * 2.5 + a * 6, y - hh * .6, x + a * 22, y - hh); c.stroke(); }
+  if (n.st === 'empty') { const d = shade(col, -.2); line3(c, [gp(-3)[0], gp(-3)[1], 0], [gp(-4)[0], gp(-4)[1], 5], d, 1.8); line3(c, [gp(2)[0], gp(2)[1], 0], [gp(3)[0], gp(3)[1], 4], d, 1.8); return; }
+  for (let i = 0; i < 9; i++) {
+    const a = (i - 4) * 0.22, hh = 15 + ((n.v * 7 + i * 5) % 9), b0 = gp((i - 4) * 2.2), b1 = gp((i - 4) * 2.5 + a * 22);
+    line3(c, [b0[0], b0[1], 0], [b1[0], b1[1], hh], shade(col, ((i % 3) - 1) * .08), 2.2);
+  }
 }
 function drawHerb(c, n, o) {
   shadow(c, .5, .5, .2, .12);
-  const [x, y] = P(.5, .5, 0);
   const col = shade(['#5fbd6e', '#4fae62', '#a0a24a', '#9ab8a4'][o.season], vv(n));
   const full = n.st !== 'empty';
-  for (const [dx, dy, r] of full ? [[-7, -4, 6], [6, -3, 6], [0, -9, 7], [-1, -2, 6]] : [[0, -2, 4]]) { c.fillStyle = col; c.beginPath(); c.ellipse(x + dx, y + dy, r, r * .65, 0, 0, 7); c.fill(); }
-  if (full && o.season < 3) { c.fillStyle = '#b79ae0'; for (const [dx, dy] of [[-4, -12], [5, -10], [0, -15]]) { c.beginPath(); c.arc(x + dx, y + dy, 1.8, 0, 7); c.fill(); } }
+  for (const [dx, dy, r] of full ? [[-7, -4, 6], [6, -3, 6], [0, -9, 7], [-1, -2, 6]] : [[0, -2, 4]]) { const [gx, gy] = gp(dx); blob(c, gx, gy, -dy + 2, r, r * .75, col); }
+  if (full && o.season < 3) for (const [dx, dy] of [[-4, -12], [5, -10], [0, -15]]) { const [gx, gy] = gp(dx); blob(c, gx + .02, gy + .02, -dy, 1.9, 1.9, '#b79ae0'); }
 }
 function drawMushroom(c, n) {
   shadow(c, .5, .5, .2, .14);
-  const [x, y] = P(.5, .5, 0);
   for (const [dx, dy, r, col] of [[-6, 0, 6, '#d65a4a'], [5, 2, 5, '#e0a24a'], [0, -3, 7, '#c94f43']]) {
-    c.fillStyle = '#efe6d2'; c.fillRect(x + dx - 1.6, y + dy - r * .8, 3.2, r * .9);
-    c.fillStyle = col; c.beginPath(); c.ellipse(x + dx, y + dy - r * .8, r, r * .62, 0, Math.PI, 0); c.fill();
-    c.fillStyle = 'rgba(255,255,255,.8)'; c.beginPath(); c.arc(x + dx - r * .3, y + dy - r * 1.1, 1, 0, 7); c.arc(x + dx + r * .35, y + dy - r * .95, 1, 0, 7); c.fill();
+    const [gx, gy] = gp(dx, dy * .6);
+    cyl(c, gx, gy, 0, 1.8 / 45.25 * 1.3, r * .9, '#efe6d2');
+    blob(c, gx, gy, r * .9, r, r * .62, col);
+    blob(c, gx + .025, gy + .025, r * 1.35, 1.3, 1, 'rgba(255,255,255,.85)');
   }
 }
 const FCOL = ['#f07aa8', '#f6d34a', '#ffffff', '#8aa8f0', '#f58a4a'];
 function drawFlowers(c, n, o) {
-  const [x, y] = P(.5, .5, 0);
-  if (n.st === 'empty' || o.season === 3) { c.strokeStyle = '#6fae5a'; c.lineWidth = 1.4; c.beginPath(); for (const dx of [-5, 0, 5]) { c.moveTo(x + dx, y + 2); c.lineTo(x + dx, y - 5); } c.stroke(); return; }
+  if (n.st === 'empty' || o.season === 3) { for (const dx of [-5, 0, 5]) { const [gx, gy] = gp(dx, 1); line3(c, [gx, gy, 0], [gx, gy, 6], '#6fae5a', 1.6); } return; }
   const col = FCOL[n.v % 5];
   for (const [dx, dy] of [[-10, 2], [-2, -3], [8, 1], [3, 6], [-7, 7], [13, -4]]) {
-    c.strokeStyle = '#5da84e'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(x + dx, y + dy + 3); c.lineTo(x + dx, y + dy - 6); c.stroke();
-    c.fillStyle = col; for (let i = 0; i < 5; i++) { const a = i * 1.2566; c.beginPath(); c.arc(x + dx + Math.cos(a) * 2.6, y + dy - 8 + Math.sin(a) * 2.6, 2, 0, 7); c.fill(); }
-    c.fillStyle = '#f5c84a'; c.beginPath(); c.arc(x + dx, y + dy - 8, 1.6, 0, 7); c.fill();
+    const [gx, gy] = gp(dx, dy);
+    line3(c, [gx, gy, 0], [gx, gy, 8], '#5da84e', 1.6);
+    for (let i = 0; i < 5; i++) { const a = i * 1.2566; blob(c, gx + Math.cos(a) * 2.6 / 64, gy - Math.cos(a) * 2.6 / 64, 9 - Math.sin(a) * 2.6, 2.1, 2.1, col); }
+    blob(c, gx, gy, 9, 1.6, 1.6, '#f5c84a');
   }
 }
 function drawReeds(c, n, o) {
-  const [x, y] = P(.5, .5, 0);
   const col = ['#7db860', '#6aa655', '#b5a455', '#b7c0a8'][o.season];
-  const full = n.st !== 'empty'; c.lineCap = 'round';
+  const full = n.st !== 'empty';
   for (let i = 0; i < (full ? 8 : 3); i++) {
-    const dx = (i - 3.5) * 3.4, hh = (full ? 32 : 10) + ((n.v + i * 3) % 7) * 2;
-    c.strokeStyle = col; c.lineWidth = 1.8; c.beginPath(); c.moveTo(x + dx, y + 2); c.quadraticCurveTo(x + dx + 1, y - hh * .6, x + dx + (i % 2 ? 3 : -3), y - hh); c.stroke();
-    if (full && i % 2 === 0) { c.strokeStyle = '#8a5a34'; c.lineWidth = 3.4; c.beginPath(); c.moveTo(x + dx + (i % 2 ? 3 : -3), y - hh); c.lineTo(x + dx + (i % 2 ? 3.4 : -3.4), y - hh + 7); c.stroke(); }
+    const dx = (i - 3.5) * 3.4, hh = (full ? 32 : 10) + ((n.v + i * 3) % 7) * 2, tip = dx + (i % 2 ? 3 : -3), b0 = gp(dx, 1), b1 = gp(tip);
+    line3(c, [b0[0], b0[1], 0], [b1[0], b1[1], hh], col, 2);
+    if (full && i % 2 === 0) line3(c, [b1[0], b1[1], hh - 6], [b1[0], b1[1], hh + 1], '#8a5a34', 3.6);
   }
 }
 function drawClay(c, n) {
@@ -124,7 +122,7 @@ function drawSticks(c, n) {
   line3(c, [.28, .55, 2], [.72, .4, 3], '#8a6440', 2.6); line3(c, [.3, .38, 2], [.7, .62, 3], '#7a5638', 2.6); line3(c, [.4, .3, 4], [.62, .7, 4], '#9a7248', 2.4);
 }
 function drawDrift(c) { shadow(c, .5, .5, .3, .1); cyl(c, .5, .5, 0, .08, 6, '#c9bfa8', { top: '#e2d9c4' }); line3(c, [.25, .7, 4], [.8, .35, 5], '#b8ae98', 5); line3(c, [.3, .3, 2], [.45, .5, 3], '#a99f8a', 3); }
-function drawShell(c, n) { const [x, y] = P(.5, .5, 0); c.fillStyle = ['#f3c6c0', '#f0e0c8', '#d6c8f0'][n.v % 3]; c.beginPath(); c.ellipse(x, y - 2, 5, 4, 0, Math.PI, 0); c.fill(); c.strokeStyle = 'rgba(0,0,0,.18)'; c.lineWidth = .8; for (const dx of [-2.5, 0, 2.5]) { c.beginPath(); c.moveTo(x, y - 1); c.lineTo(x + dx, y - 6); c.stroke(); } }
+function drawShell(c, n) { blob(c, .5, .5, 2, 5, 3.4, ['#f3c6c0', '#f0e0c8', '#d6c8f0'][n.v % 3]); }
 function drawScrap(c, n) {
   shadow(c, .5, .5, .4, .2);
   box(c, .18, .3, 0, .42, .36, 11, '#8e6a54', { tex: 'planks' });
@@ -140,8 +138,7 @@ function drawSandpile(c, n) {
 function drawPoop(c) {
   shadow(c, .5, .5, .18, .12);
   blob(c, .5, .5, 2, 7, 4.5, '#6b4527', { lo: '#4e311c' }); blob(c, .5, .5, 6, 5, 3.4, '#7a5030'); blob(c, .5, .5, 9.5, 3, 2.2, '#8a5d38');
-  c.strokeStyle = 'rgba(190,200,120,.55)'; c.lineWidth = 1; c.lineCap = 'round';   // «запах»
-  for (const dx of [-3, 3]) { const [x, y] = P(.5, .5, 14); c.beginPath(); c.moveTo(x + dx, y); c.quadraticCurveTo(x + dx + 2, y - 3, x + dx, y - 6); c.stroke(); }
+  for (const dx of [-3, 3]) { const [gx, gy] = gp(dx); line3(c, [gx, gy, 14], [gx + .03, gy - .03, 20], 'rgba(190,200,120,.55)', 1.2); }   // «запах»
 }
 const give = (o) => o;
 export const NDEF = {

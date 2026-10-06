@@ -88,8 +88,8 @@ export class Builder {
   }
   setRot(a) { this.rot = a; this.cr = Math.cos(a); this.sr = Math.sin(a); }
   // ── совместимость с canvas: смещения и безобидные заглушки (мелкие 2D-детали переписаны вручную) ──
-  save() { this.stack.push([this.tdx, this.tdz]); }
-  restore() { const s = this.stack.pop(); if (s) { this.tdx = s[0]; this.tdz = s[1]; } }
+  save() { this.stack.push([this.tdx, this.tdz, this.globalAlpha]); }
+  restore() { const s = this.stack.pop(); if (s) { this.tdx = s[0]; this.tdz = s[1]; this.globalAlpha = s[2]; } }
   translate(dx, dy) { this.tdx += dx; this.tdz -= dy; }
   createLinearGradient() { return { addColorStop() {} }; }
   createRadialGradient() { return { addColorStop() {} }; }
@@ -100,6 +100,8 @@ for (const m of ['scale', 'rotate', 'beginPath', 'closePath', 'moveTo', 'lineTo'
 // ───────────── примитивы ─────────────
 const swp = (x, y) => (SW ? [y, x] : [x, y]);
 const bufOf = (c, col) => (col[3] < 0.98 ? c.tr : c.lit);
+// цвет с учётом c.globalAlpha (как в canvas)
+const K = (c, s) => { const k = rgba(s); return c.globalAlpha < 1 ? [k[0], k[1], k[2], k[3] * c.globalAlpha] : k; };
 
 // Мягкая тень на земле (круг радиуса r в клетках)
 export function shadow(c, cx, cy, r, a = 0.2) {
@@ -116,7 +118,7 @@ export function shadow(c, cx, cy, r, a = 0.2) {
 export function diamond(c, x, y, w, d, fill, stroke, lw = 1, z = 0) {
   if (!fill) return;
   if (SW) { [x, y] = [y, x]; [w, d] = [d, w]; }
-  const col = rgba(fill), b = bufOf(c, col), e = 0.004;
+  const col = K(c, fill), b = bufOf(c, col), e = 0.004;
   b.quad(c.V(x, y + d, z), c.V(x + w, y + d, z), c.V(x + w, y, z), c.V(x, y, z), col);
   void e;
 }
@@ -136,7 +138,7 @@ export function plane(c, z, fn) {
 // Параллелепипед. tex: planks | brick | stone | logs — полосы разного оттенка на боковых гранях
 export function box(c, x, y, z, w, d, h, col, o = {}) {
   if (SW) { [x, y] = [y, x]; [w, d] = [d, w]; }
-  const side = rgba(col), top = o.top ? rgba(o.top) : side;
+  const side = K(c, col), top = o.top ? K(c, o.top) : side;
   const bu = bufOf(c, side), tp = bufOf(c, top);
   const V = (a, b, cc) => c.V(a, b, cc);
   const strips = o.tex === 'planks' || o.tex === 'brick' || o.tex === 'stone' ? Math.max(1, Math.round(h / (o.tex === 'planks' ? 4.5 : 5))) : 1;
@@ -159,7 +161,7 @@ export function box(c, x, y, z, w, d, h, col, o = {}) {
 
 // Прямоугольник на вертикальной грани. side 'L' (y=const, u вдоль x) или 'R' (x=const, u вдоль y)
 export function wallRect(c, side, pos, u0, u1, z0, z1, fill, stroke) {
-  const col = rgba(fill || stroke || '#000'), b = bufOf(c, col), t = 0.025;
+  const col = K(c, fill || stroke || '#000'), b = bufOf(c, col), t = 0.025;
   const A = side === 'L' ? [u0, pos] : [pos, u1], B = side === 'L' ? [u1, pos] : [pos, u0];
   const [ax, ay] = swp(A[0], A[1]), [bx, by] = swp(B[0], B[1]);
   const nx = Math.sign((ay - by)) * 0 + 0;     // нормаль считаем из геометрии ниже
@@ -175,7 +177,7 @@ export function wallRect(c, side, pos, u0, u1, z0, z1, fill, stroke) {
 
 // Многоугольник по точкам P(...) (с .w); двусторонний
 export function poly(c, pts, fill, stroke) {
-  const col = rgba(fill || stroke || '#000');
+  const col = K(c, fill || stroke || '#000');
   if (!fill && !(stroke && pts.length < 3)) return;
   if (!pts.every((p) => p.w)) return;
   const b = bufOf(c, col), v = pts.map((p) => c.V(p.w[0], p.w[1], p.w[2]));
@@ -188,7 +190,7 @@ export function poly(c, pts, fill, stroke) {
 // Двускатная крыша. axis 'x' | 'y' — направление конька
 export function gable(c, x, y, z, w, d, h, o, col, wallCol, axis = 'x') {
   if (SW) { [x, y] = [y, x]; [w, d] = [d, w]; axis = axis === 'x' ? 'y' : 'x'; }
-  const roof = rgba(col), wl = wallCol ? rgba(wallCol) : roof, b = c.lit, V = (a, bb, cc) => c.V(a, bb, cc), zt = z + h;
+  const roof = K(c, col), wl = wallCol ? K(c, wallCol) : roof, b = c.lit, V = (a, bb, cc) => c.V(a, bb, cc), zt = z + h;
   if (axis === 'x') {
     const my = y + d / 2;
     b.quad(V(x - o, y + d + o, z), V(x + w + o, y + d + o, z), V(x + w + o, my, zt), V(x - o, my, zt), roof);
@@ -206,14 +208,14 @@ export function gable(c, x, y, z, w, d, h, o, col, wallCol, axis = 'x') {
 // Пирамидальная крыша
 export function pyramid(c, x, y, z, w, d, h, o, col) {
   if (SW) { [x, y] = [y, x]; [w, d] = [d, w]; }
-  const k = rgba(col), b = c.lit, V = (a, bb, cc) => c.V(a, bb, cc), ap = V(x + w / 2, y + d / 2, z + h);
+  const k = K(c, col), b = c.lit, V = (a, bb, cc) => c.V(a, bb, cc), ap = V(x + w / 2, y + d / 2, z + h);
   const a = V(x - o, y - o, z), bb = V(x + w + o, y - o, z), cc = V(x + w + o, y + d + o, z), dd = V(x - o, y + d + o, z);
   b.tri(...a, ...ap, ...bb, k); b.tri(...bb, ...ap, ...cc, k); b.tri(...cc, ...ap, ...dd, k); b.tri(...dd, ...ap, ...a, k);
 }
 // Односкатная крыша: высокая сторона у y (задняя)
 export function lean(c, x, y, z, w, d, h0, h1, o, col) {
   if (SW) { [x, y] = [y, x]; [w, d] = [d, w]; }
-  const k = rgba(col), kd = rgba(shade(col, -.2)), b = c.lit, V = (a, bb, cc) => c.V(a, bb, cc), t = 2;
+  const k = K(c, col), kd = K(c, shade(col, -.2)), b = c.lit, V = (a, bb, cc) => c.V(a, bb, cc), t = 2;
   const x0 = x - o, x1 = x + w + o, y0 = y - o, y1 = y + d + o;
   b.quad(V(x0, y1, z + h0), V(x1, y1, z + h0), V(x1, y0, z + h1), V(x0, y0, z + h1), k);
   b.quad(V(x1, y1, z + h0), V(x1, y0, z + h1), V(x1, y0, z + h1 - t), V(x1, y1, z + h0 - t), kd);
@@ -225,7 +227,7 @@ export function lean(c, x, y, z, w, d, h0, h1, o, col) {
 // Цилиндр (r — в клетках)
 export function cyl(c, cx, cy, z, r, h, col, o = {}) {
   [cx, cy] = swp(cx, cy);
-  const side = rgba(col), top = o.top ? rgba(o.top) : side, n = r > 0.2 ? 14 : 10, b = bufOf(c, side);
+  const side = K(c, col), top = o.top ? K(c, o.top) : side, n = r > 0.2 ? 14 : 10, b = bufOf(c, side);
   const ctr = c.V(cx, cy, z), tz = hz(h);
   const ring = (rr, y0, hh, k) => {
     for (let i = 0; i < n; i++) {
@@ -241,7 +243,7 @@ export function cyl(c, cx, cy, z, r, h, col, o = {}) {
 // Конус (палатки, ёлки)
 export function cone(c, cx, cy, z, r, h, col) {
   [cx, cy] = swp(cx, cy);
-  const k = rgba(col), n = r > 0.2 ? 12 : 8, b = bufOf(c, k), ctr = c.V(cx, cy, z), tip = [ctr[0], ctr[1] + hz(h), ctr[2]];
+  const k = K(c, col), n = r > 0.2 ? 12 : 8, b = bufOf(c, k), ctr = c.V(cx, cy, z), tip = [ctr[0], ctr[1] + hz(h), ctr[2]];
   for (let i = 0; i < n; i++) {
     const a0 = i / n * 6.2832, a1 = (i + 1) / n * 6.2832;
     b.tri(ctr[0] + Math.cos(a1) * r, ctr[1], ctr[2] + Math.sin(a1) * r, ctr[0] + Math.cos(a0) * r, ctr[1], ctr[2] + Math.sin(a0) * r, tip[0], tip[1], tip[2], k);
@@ -266,7 +268,7 @@ const ICO = (() => {
 })();
 export function blob(c, cx, cy, z, rx, ry, col, o = {}) {
   [cx, cy] = swp(cx, cy);
-  const k = rgba(col), b = bufOf(c, k), ctr = c.V(cx, cy, z), R = rx / KX, Ry = R * (ry / rx) * 1.15, { v, f } = ICO;
+  const k = K(c, col), b = bufOf(c, k), ctr = c.V(cx, cy, z), R = rx / KX, Ry = R * (ry / rx) * 1.15, { v, f } = ICO;
   const p = (i) => [ctr[0] + v[i][0] * R, ctr[1] + v[i][1] * Ry, ctr[2] + v[i][2] * R];
   for (const [a, bb, cc] of f) { const A = p(a), B = p(bb), C = p(cc); b.tri(...A, ...B, ...C, k); }
 }
@@ -275,7 +277,7 @@ export function ball(c, cx, cy, z, r, col) { blob(c, cx, cy, z, r, r, col); }
 // Стержень между двумя точками (lw — толщина в пикселях)
 export function line3(c, a, b, col, lw = 1.5) {
   const [ax, ay] = swp(a[0], a[1]), [bx, by] = swp(b[0], b[1]);
-  const p = c.V(ax, ay, a[2] || 0), q = c.V(bx, by, b[2] || 0), k = rgba(col), buf = bufOf(c, k);
+  const p = c.V(ax, ay, a[2] || 0), q = c.V(bx, by, b[2] || 0), k = K(c, col), buf = bufOf(c, k);
   const dx = q[0] - p[0], dy = q[1] - p[1], dz = q[2] - p[2], len = Math.hypot(dx, dy, dz) || 1e-6;
   const r = Math.max(0.012, lw / KX / 2);
   // перпендикуляры: берём мировую вертикаль, если стержень не вертикален
@@ -300,4 +302,28 @@ export function flame(c, cx, cy, z, size, t, seed = 0) {
       c.emi.tri(ctr[0] + Math.cos(a1) * R, ctr[1], ctr[2] + Math.sin(a1) * R, ctr[0] + Math.cos(a0) * R, ctr[1], ctr[2] + Math.sin(a0) * R, tip[0], tip[1], tip[2], k);
     }
   });
+}
+
+// Лента по кривой Безье (провисшая ткань, гирлянда): p0, pc, p1 — мировые точки [x, y, z px]; halfW — полуширина вдоль y (в клетках)
+export function ribbon(c, p0, pc, p1, halfW, col, n = 8) {
+  const k = K(c, col), b = bufOf(c, k);
+  const pt = (t, dy) => {
+    const u = 1 - t, x = u * u * p0[0] + 2 * u * t * pc[0] + t * t * p1[0], y = u * u * p0[1] + 2 * u * t * pc[1] + t * t * p1[1], z = u * u * p0[2] + 2 * u * t * pc[2] + t * t * p1[2];
+    const [a, bb] = swp(x, y + dy); return c.V(a, bb, z);
+  };
+  for (let i = 0; i < n; i++) { const t0 = i / n, t1 = (i + 1) / n; b.quad(pt(t0, -halfW), pt(t1, -halfW), pt(t1, halfW), pt(t0, halfW), k); }
+}
+// Тонкая линия по кривой Безье из стержней
+export function curve3(c, p0, pc, p1, col, lw = 1.5, n = 8) {
+  let prev = p0;
+  for (let i = 1; i <= n; i++) {
+    const t = i / n, u = 1 - t, q = [u * u * p0[0] + 2 * u * t * pc[0] + t * t * p1[0], u * u * p0[1] + 2 * u * t * pc[1] + t * t * p1[1], u * u * p0[2] + 2 * u * t * pc[2] + t * t * p1[2]];
+    line3(c, prev, q, col, lw); prev = q;
+  }
+}
+// Светящееся пятно (огонёк, лампочка): эмиссивный шарик без освещения
+export function glow(c, cx, cy, z, r, col) {
+  [cx, cy] = swp(cx, cy);
+  const k = K(c, col), ctr = c.V(cx, cy, z), R = r / KX, { v, f } = ICO, p = (i) => [ctr[0] + v[i][0] * R, ctr[1] + v[i][1] * R, ctr[2] + v[i][2] * R];
+  for (const [a, bb, cc] of f) { const A = p(a), B = p(bb), C = p(cc); (k[3] < .98 ? c.tr : c.emi).tri(...A, ...B, ...C, k); }
 }

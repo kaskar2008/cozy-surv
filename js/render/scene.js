@@ -72,7 +72,7 @@ export function renderWorld(ctx, t, dt) {
   roots.world.visible = true; roots.room.visible = false;
   const season_ = season(), dk = darkness(), dpr = cam.dpr;
   const o = { season: season_, dusk: dk > .22, night: dk > .55, raining: G.weather.type === 'rain', t };
-  updateCam(dt); setBg(WATER_BG);
+  updateCam(); setBg(WATER_BG);
   syncCamera(); setSun(hour(), dk, o.raining);
   let p0 = pnow();
   updateTerrain(roots.world, season_); p0 = mark('r.terrain', p0);
