@@ -8,7 +8,8 @@ import { easeOutBack } from '../core/util.js';
 import { cam, worldToScreen, viewTiles, updateCam } from './camera.js';
 import { initGL, syncCamera, setSun, setBg, scene, renderer, camera3 } from './gl.js';
 import { updateTerrain, drawSparkles, WATER_BG } from './terrain.js';
-import { getModel, Instancer, DynBatch, MAT } from './models.js';
+import { getModel, Instancer, DynBatch, MAT, topHeightAt } from './models.js';
+import { bldAt } from '../game/world.js';
 import { buildPlayer, buildPet, buildTraveler, drawWorkRing, drawPetBubble, drawZ, drawGift } from './entities.js';
 import { drawParts, drawAmbient } from './fx.js';
 import { drawLighting } from './lighting.js';
@@ -40,6 +41,38 @@ function nodeModel(n, def, o) {
   return getModel(`${n.t}|${def.key(n, o)}`, 1, 1, def.h, (c) => def.draw(c, n, o));
 }
 export { bldModel };
+
+// Положение существа по высоте: по настилам и причалам идёт поверх досок, на сиденье сидит, в гамаке лежит;
+// высота сглаживается, чтобы не «подпрыгивать»
+const heights = new WeakMap();
+function entityPose(e, o, isPlayer, t) {
+  const b = bldAt(Math.floor(e.x), Math.floor(e.y));
+  let h = 0, pose = null;
+  if (b && !b.bld) {
+    const def = BDEF[b.t];
+    if (def.draw && !def.terraform) {
+      const m = bldModel(b, def, o);
+      if (isPlayer && e.fx === 'sit' && def.id === 'swing') {
+        // сиденье качелей — подвижная деталь (см. anim в leisure.js)
+        const sw = Math.sin(t * 1.8 + b.v) * .6, dy = Math.sin(sw) * .88, dz = 78 - Math.cos(sw) * 46 + 3;
+        pose = b.rot ? { x: b.x + .5 + dy, y: b.y + b.d / 2, h: hz(dz) } : { x: b.x + b.w / 2, y: b.y + .5 + dy, h: hz(dz) };
+        h = pose.h;
+      } else if (isPlayer && (e.fx === 'sleep' || e.fx === 'nap') && def.nap) {
+        // в гамаке: голова у левого края, тело вдоль гамака
+        const cx = b.x + b.w / 2, cy = b.y + b.d / 2;
+        pose = b.rot ? { x: cx, y: cy - .31, ang: Math.PI / 2, h: hz(23), cover: '#e8c8a8' } : { x: cx - .31, y: cy, ang: 0, h: hz(23), cover: '#e8c8a8' };
+        h = pose.h;
+      } else {
+        const top = topHeightAt(m, e.x - b.x, e.y - b.y);
+        if (top != null && (def.flat ? top < .45 : isPlayer && e.fx === 'sit')) h = top;
+      }
+    }
+  }
+  const prev = heights.get(e) ?? 0, cur = prev + (h - prev) * .35;
+  heights.set(e, cur);
+  if (pose) return pose;
+  return cur > .004 ? { h: cur } : null;
+}
 
 const lightOn = (b, def, o) => {
   const w = def.light.on;
@@ -103,9 +136,9 @@ export function renderWorld(ctx, t, dt) {
     inst.add(nodeModel(n, def, o), n.x + dx, n.y);
   }
   const pl = G.player || G.player;
-  if (G.scene === 'world') { buildPlayer(c, pl, t); }
-  for (const p of G.pets) if (!p.in) buildPet(c, p, t);
-  if (G.npc) buildTraveler(c, G.npc, t);
+  if (G.scene === 'world') buildPlayer(c, pl, t, entityPose(pl, o, true, t));
+  for (const p of G.pets) if (!p.in) buildPet(c, p, t, entityPose(p, o, false, t));
+  if (G.npc) buildTraveler(c, G.npc, t, entityPose(G.npc, o, false, t));
   c.setRot(0); c.ox = c.oy = c.oz = 0;
   p0 = mark('r.collect', p0);
 

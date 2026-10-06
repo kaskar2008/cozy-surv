@@ -31,10 +31,10 @@ function person(c, o, t) {
       bc(c, sx + 1, s * 2.6, 0, 6, 4.2, 2.6, '#3a2a2a');
     }
   } else {
-    for (const s of [-1, 1]) { bc(c, 4.5, s * 2.6, 3, 11, 3.8, 4, '#5a4a6a'); bc(c, 10, s * 2.6, 1, 3.4, 4, 5, '#3a2a2a'); }
+    for (const s of [-1, 1]) { bc(c, 3.5, s * 2.6, 1.5, 12, 3.8, 4, '#5a4a6a'); bc(c, 9.5, s * 2.6, -4, 3.6, 4, 9, '#5a4a6a'); bc(c, 10.5, s * 2.6, -5, 6, 4.2, 2.6, '#3a2a2a'); }
   }
   // торс
-  const tz = 10 + (sit ? 0 : -lower * .3) - bob * .3, th = 16 - lower * .3;
+  const tz = sit ? 3.5 : 10 - lower * .3 - bob * .3, th = 16 - lower * .3;
   bc(c, 0, 0, tz, 8, 12.5, th, o.shirt);
   bc(c, 0, 0, tz + th - 3, 8.2, 12.7, 3, shade(o.shirt, .14));
   if (o.cloak) bc(c, -2.6, 0, tz - 6, 3, 14, th + 6, o.cloak);
@@ -71,28 +71,30 @@ function person(c, o, t) {
   if (hat === 4) for (let i = 0; i < 8; i++) { const a = i / 8 * 6.283; ball(c, Math.cos(a) * 6.8, Math.sin(a) * 6.8, hz0 + 4.5, 2.2, 2.2, ['#f08ac0', '#f5d34a', '#ffffff', '#8aa8f0'][i % 4]); }
 }
 
-function lying(c, skin, hair, pillow = '#e8d6b6') {
-  shadow(c, 0, 0, .4, .2);
-  ball(c, -9 * 1, 0, 8, 6.4, 6, skin); ball(c, -10, 0, 10, 6.8, 6, hair);
-  bc(c, 5, 0, 3, 20, 11, 8, pillow);
-  bc(c, -7, 2, 9, 1.4, 1.4, 1.6, '#2a1e1e');
+// лёжа: голова в начале (−x), тело вытянуто вперёд (+x); cover — цвет одеяла, pillow — приподнять голову на подушку
+function lying(c, skin, hair, cover = '#e8d6b6', pillow = 0) {
+  shadow(c, 0, 0, .45, .16);
+  const hz0 = 6 + pillow;
+  ball(c, 0, 0, hz0, 6.4, 6.2, skin); ball(c, -1.2, 0, hz0 + 1.8, 6.8, 6.2, hair);
+  bc(c, 15, 0, 1 + pillow * .3, 26, 11.5, 7, cover); bc(c, 15, 0, 7 + pillow * .3, 26, 11.7, 1.6, shade(cover, .12));
+  bc(c, 5.4, 2.6, hz0 + .8, 1.4, 1.6, 1.6, '#2a1e1e'); bc(c, 5.4, -2.6, hz0 + .8, 1.4, 1.6, 1.6, '#2a1e1e');
 }
 
-function place(c, e, z = 0) { c.ox = e.x; c.oy = e.y; c.oz = z; c.setRot(angOf(e)); }
+function place(c, e, pose) { c.ox = pose?.x ?? e.x; c.oy = pose?.y ?? e.y; c.oz = pose?.h || 0; c.setRot(pose?.ang ?? angOf(e)); }
 
-export function buildPlayer(c, p, t) {
-  place(c, p);
-  if (p.fx === 'sleep' || p.fx === 'nap') { c.setRot(-Math.PI / 4); lying(c, '#f2cfa5', '#6a4a34'); return; }
+export function buildPlayer(c, p, t, pose) {
+  place(c, p, pose);
+  if (p.fx === 'sleep' || p.fx === 'nap') { lying(c, '#f2cfa5', '#6a4a34', pose?.cover, pose?.pillow); return; }
   if (p.fx === 'bathe') { ball(c, 0, 0, 22, 7.2, 7.2, '#f2cfa5'); ball(c, -1.4, 0, 24, 7.7, 7.2, '#6a4a34'); return; }
   person(c, { moving: p.moving, fx: p.fx, shirt: SHIRTS[p.outfit.shirt % SHIRTS.length], hat: p.outfit.hat, prog: p.workT }, t);
 }
-export function buildTraveler(c, n, t) {
-  place(c, n);
+export function buildTraveler(c, n, t, pose) {
+  place(c, n, pose);
   person(c, { moving: n.moving, fx: n.sit ? 'sit' : null, shirt: '#6a5a8a', cloak: '#5a4a7a', hat: 0, hair: '#8a8a8a' }, t);
   bc(c, -8, 0, 12, 6, 9, 13, '#8a6440');
 }
-export function buildPet(c, pet, t) {
-  place(c, pet);
+export function buildPet(c, pet, t, pose) {
+  place(c, pet, pose);
   const cat = pet.kind === 'cat', col = pet.col || (cat ? '#e8a05a' : '#c9915f'), dk = shade(col, -.25);
   shadow(c, 0, 0, .22, .2);
   if (pet.sleep) {

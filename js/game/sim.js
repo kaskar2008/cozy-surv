@@ -5,7 +5,7 @@ import * as eco from './eco.js';
 import { netOf, netAdd, netTake, isHot, heated, ensureLinks } from './nets.js';
 import { updatePlayer } from './player.js';
 import { COMPOST_T, MILL_T } from './progress.js';
-import { compostsNear, finishBuild, S, toast, stat, stationHeatOk, canCraft, flowersNear, addBuff, buffSum, wakeUp, nearHeat } from './api.js';
+import { compostsNear, scarecrowsNear, finishBuild, S, toast, stat, stationHeatOk, canCraft, flowersNear, addBuff, buffSum, wakeUp, nearHeat } from './api.js';
 import { BDEF } from '../data/buildings/index.js';
 import { STATIONS } from '../data/recipes.js';
 import { CROPS, growMult, SEASONS } from '../data/crops.js';
@@ -204,7 +204,7 @@ export function updateStation(b, def, dt) {
 function updateCrops(b, def, dt) {
   const gh = def.tags.includes('greenhouse'), s = season(), rainy = G.weather.type === 'rain';
   b._sc = (b._sc || 0) - dt;
-  if (b._sc <= 0) { b._sc = 4; b._scare = 1; for (const o of G.bMap.values()) if (BDEF[o.t].tags.includes('scarecrow') && Math.hypot(o.x - b.x, o.y - b.y) <= 4.5) { b._scare = 1.1; break; } }
+  if (b._sc <= 0) { b._sc = 4; b._scare = scarecrowsNear(b).length ? 1.1 : 1; }
   const wet = G.comp.water.has(b.id);
   if (b._cc === undefined || (b._cc -= dt) <= 0) { b._cc = 3; b._comp = compostsNear(b); }
   for (const p of b.st.plots) {

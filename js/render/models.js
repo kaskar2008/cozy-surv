@@ -112,3 +112,28 @@ export class DynBatch {
     }
   }
 }
+
+// Высота самой верхней «смотрящей вверх» грани модели в точке (x, z) локальных координат (мировые единицы) — для посадки на сиденье
+// и хождения по настилам; null, если там ничего нет
+export function topHeightAt(model, x, z) {
+  const key = Math.round(x * 8) + ',' + Math.round(z * 8);
+  const cache = model._top || (model._top = new Map());
+  if (cache.has(key)) return cache.get(key);
+  let best = null;
+  for (const p of model.parts) {
+    if (p.mat !== MAT.lit) continue;
+    const pos = p.geo.attributes.position.array, nor = p.geo.attributes.normal.array;
+    for (let i = 0; i < pos.length; i += 9) {
+      if (nor[i + 1] < 0.35) continue;
+      const ax = pos[i], az = pos[i + 2], bx = pos[i + 3], bz = pos[i + 5], cx = pos[i + 6], cz = pos[i + 8];
+      const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+      if (Math.abs(d) < 1e-9) continue;
+      const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d, l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d, l3 = 1 - l1 - l2;
+      if (l1 < -1e-4 || l2 < -1e-4 || l3 < -1e-4) continue;
+      const y = l1 * pos[i + 1] + l2 * pos[i + 4] + l3 * pos[i + 7];
+      if (best === null || y > best) best = y;
+    }
+  }
+  cache.set(key, best);
+  return best;
+}

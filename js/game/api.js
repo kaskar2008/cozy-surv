@@ -335,6 +335,10 @@ export function takeCompost(b) {
 // компост рядом с грядкой (зазор между постройками до 3 клеток): сам удобряет посевы
 const gap = (a, b) => Math.hypot(Math.max(a.x - (b.x + b.w), b.x - (a.x + a.w), 0), Math.max(a.y - (b.y + b.d), b.y - (a.y + a.d), 0));
 export function compostsNear(b) { const out = []; for (const o of G.bMap.values()) if (BDEF[o.t].compost && gap(o, b) <= 3) out.push(o); return out; }
+// пугало действует на грядки, до которых от него не больше 4 клеток (радиус кольца на призраке)
+const SCARE_R = 4;
+export function scarecrowsNear(b) { const out = []; for (const o of G.bMap.values()) if (BDEF[o.t].tags.includes('scarecrow') && !o.bld && o !== b && gap(o, b) <= SCARE_R) out.push(o); return out; }
+export function cropsInScare(b) { const out = []; for (const o of G.bMap.values()) if (BDEF[o.t].crops && gap(o, b) <= SCARE_R) out.push(o); return out; }
 export function cropsNear(b) { const out = []; for (const o of G.bMap.values()) if (BDEF[o.t].crops && gap(o, b) <= 3) out.push(o); return out; }
 // грядки
 export function plantCrop(b, plotIdx, crop) {
@@ -579,6 +583,8 @@ export function linksOf(b) {
   }
   if (def.crops) for (const o of compostsNear(b)) add(o, '#9bc46a');
   if (def.compost) for (const o of cropsNear(b)) add(o, '#9bc46a');
+  if (def.crops) for (const o of scarecrowsNear(b)) add(o, '#f0cf6a');
+  if (def.tags.includes('scarecrow')) for (const o of cropsInScare(b)) add(o, '#f0cf6a');
   for (const o of b.nb) {
     const od = BDEF[o.t];
     if (def.needs?.includes('heat') && isHot(o)) add(o, '#ff9a50');
@@ -598,6 +604,8 @@ export function linksForGhost(def, fake) {
     if (!def.net?.[type]) continue;
     for (const o of fake.nb) if (BDEF[o.t].net?.[type]) out.push({ b: o, col: type === 'water' ? '#6cc4ee' : '#ffd36e' });
   }
+  if (def.crops) for (const o of G.bMap.values()) if (BDEF[o.t].tags.includes('scarecrow') && !o.bld && gap(o, fake) <= SCARE_R) out.push({ b: o, col: '#f0cf6a' });
+  if (def.tags.includes('scarecrow')) for (const o of cropsInScare(fake)) out.push({ b: o, col: '#f0cf6a' });
   for (const o of fake.nb) {
     const od = BDEF[o.t];
     if (def.needs?.includes('heat') && isHot(o)) out.push({ b: o, col: '#ff9a50' });

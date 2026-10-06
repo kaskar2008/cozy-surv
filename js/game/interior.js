@@ -13,7 +13,7 @@ import * as fx from '../render/fx.js';
 import * as THREE from 'three';
 import { cam, screenToWorld, worldToScreen, centerOn, panScreen, resetAz } from '../render/camera.js';
 import { HW, HH, box, wallRect, diamond, setSwap, hz } from '../core/iso.js';
-import { getModel, Instancer, DynBatch } from '../render/models.js';
+import { getModel, Instancer, DynBatch, topHeightAt } from '../render/models.js';
 import { syncCamera, setSun, setBg, renderer, scene, camera3 } from '../render/gl.js';
 import { shade, hash2, rndi, pick, rnd } from '../core/util.js';
 import { sfx } from '../core/audio.js';
@@ -327,6 +327,23 @@ function wallDecal(home, it, d, o, t, frame) {
   }
 }
 
+// Где в комнате сидит и спит персонаж: высота по самому верху мебели под ним, постель — вдоль кровати, голова на подушке
+const BED = { bed: { head: [.5, .38], h: hz(15.5), pillow: 4 }, double_bed: { head: [.55, .42], h: hz(16), pillow: 5 }, bedroll: { head: [.5, .4], h: hz(5), pillow: 1 } };
+function interiorPose(home, p, o) {
+  const it = home.in.items.find((q) => { const d = FDEF[q.t]; return !d.wall && p.x >= q.x && p.x < q.x + q.w && p.y >= q.y && p.y < q.y + q.d && (d.sit || d.sleep); });
+  if (!it) return null;
+  const d = FDEF[it.t];
+  if ((p.fx === 'sleep' || p.fx === 'nap') && BED[it.t]) {
+    const bd = BED[it.t], [hx, hy] = it.rot ? [bd.head[1], bd.head[0]] : bd.head;
+    return { x: it.x + hx, y: it.y + hy, ang: it.rot ? 0 : Math.PI / 2, h: bd.h, pillow: bd.pillow, cover: it.t === 'bedroll' ? '#e8c98a' : BLANKET[(it.v + (it.t === 'double_bed' ? 2 : 0)) % 5] };
+  }
+  if (p.fx === 'sit' && d.sit) {
+    const top = topHeightAt(furnModel(it, d, o), p.x - it.x, p.y - it.y);
+    if (top != null) return { h: top };
+  }
+  return null;
+}
+const BLANKET = ['#d46a6a', '#6a9ad4', '#6ac48a', '#d4b24a', '#a37ad4'];
 export function renderInterior(ctx, t, dt) {
   const home = homeOf(); if (!home) return;
   if (!roomInst) { roomInst = new Instancer(roots.room); roomDyn = new DynBatch(roots.room); }
@@ -356,7 +373,7 @@ export function renderInterior(ctx, t, dt) {
   }
   for (const [uid, e] of wallTex) if (e.used !== frame) { roots.room.remove(e.mesh); e.mesh.geometry.dispose(); e.tex.dispose(); e.mesh.material.dispose(); wallTex.delete(uid); }
   const p = G.player;
-  buildPlayer(c, p, t);
+  buildPlayer(c, p, t, interiorPose(home, p, o));
   for (const pet of G.pets) if (pet.in === home.id) buildPet(c, pet, t);
   c.setRot(0); c.ox = c.oy = c.oz = 0;
   const gh = R.ghost;
