@@ -1,6 +1,7 @@
 import { reg } from './registry.js';
 import { P, box, cyl, cone, blob, shadow, line3, poly, plane, gable, pyramid, wallRect, lean, flame, curve3, ribbon, glow } from '../../core/iso.js';
 import { shade, hash2 } from '../../core/util.js';
+import { cam } from '../../render/camera.js';
 
 const pathBase = (c, b, col, spots, round = .16) => plane(c, 0, (g) => {
   g.fillStyle = col; g.beginPath(); g.roundRect(.02, .02, .96, .96, round); g.fill();
@@ -90,17 +91,18 @@ reg([
     id: 'windchime', name: 'Ветряные колокольчики', cat: 'decor', icon: '🎐', cost: { shell: 3, rope: 1, sticks: 2 }, h: 80, cozy: 3,
     desc: 'Ракушки на ниточках тихо звенят на ветру.',
     draw(c) { shadow(c, .5, .5, .12, .14); cyl(c, .5, .5, 0, .035, 50, '#7b5535'); line3(c, [.5, .5, 50], [.78, .5, 46], '#7b5535', 2.4); },
-    anim(c, b, t) { const sw = Math.sin(t * 1.7 + b.v) * 3; for (let i = 0; i < 4; i++) { const t0 = (i - 1.5) * 3, dx = (i - 1.5) * 4 + sw, L = 10 + (i % 2) * 6; line3(c, [.78 + t0 / 64, .5 - t0 / 64, 46], [.78 + dx / 64, .5 - dx / 64, 46 - L], '#e8e0d0', 1); blob(c, .78 + dx / 64, .5 - dx / 64, 46 - L - 2, 2.6, 3.4, ['#f3c6c0', '#f0e0c8', '#d6c8f0', '#c8e6f0'][i]); } },
+    anim(c, b, t) { const sw = Math.sin(t * 1.7 + b.v) * .05; for (let i = 0; i < 4; i++) { const a = i * 1.571 + .6, tx = .78 + Math.cos(a) * .045, ty = .5 + Math.sin(a) * .045, L = 10 + (i % 2) * 6; line3(c, [tx, ty, 46], [tx + sw, ty - sw, 46 - L], '#e8e0d0', 1.2); blob(c, tx + sw, ty - sw, 46 - L - 2, 2.8, 3.4, ['#f3c6c0', '#f0e0c8', '#d6c8f0', '#c8e6f0'][i]); } },
   },
   {
     id: 'pinwheel', name: 'Вертушка', cat: 'decor', icon: '🎡', cost: { sticks: 2, cloth: 1 }, h: 60, cozy: 2, drag: true,
     desc: 'Яркая вертушка крутится на ветру.',
     draw(c) { shadow(c, .5, .5, .1, .12); cyl(c, .5, .5, 0, .025, 34, '#7b5535'); },
     anim(c, b, t) {
-      const K = 1 / 45.25 * Math.SQRT1_2, cols = ['#e8584a', '#f5d34a', '#4a9ae8', '#6fc47a'], th0 = t * 2.2 + b.v;
-      const pt = (u, v, th) => P(.5 + (u * Math.cos(th) - v * Math.sin(th)) * K, .5 - (u * Math.cos(th) - v * Math.sin(th)) * K, 38 + u * Math.sin(th) + v * Math.cos(th));
+      // лопасти всегда развёрнуты к камере (иначе при повороте видны ребром)
+      const rx = Math.cos(cam.az) / 45.25, ry = -Math.sin(cam.az) / 45.25, cols = ['#e8584a', '#f5d34a', '#4a9ae8', '#6fc47a'], th0 = t * 2.2 + b.v;
+      const pt = (u, v, th) => { const H = u * Math.cos(th) - v * Math.sin(th); return P(.5 + H * rx, .5 + H * ry, 38 + u * Math.sin(th) + v * Math.cos(th)); };
       for (let i = 0; i < 4; i++) { const th = th0 + i * Math.PI / 2; poly(c, [pt(0, 0, th), pt(10, 0, th), pt(10, 9, th)], cols[i]); }
-      blob(c, .5 + .06, .5 - .06, 38, 1.8, 1.8, '#ffffff');
+      blob(c, .5 + rx * 3, .5 + ry * 3, 38, 1.8, 1.8, '#ffffff');
     },
   },
   {
@@ -189,8 +191,8 @@ reg([
         line3(c, [x, y, 0], [x, y, hh], o.season === 3 ? '#9a8a6a' : '#5da84e', 2.6);
         blob(c, x - 5 / 64, y + 5 / 64, hh * .45, 5, 2.6, o.season === 3 ? '#8aa07a' : '#6aae56');
         if (o.season === 3) continue;
-        for (let i = 0; i < 10; i++) { const a = i * .628; blob(c, x + Math.cos(a) * 6 / 64 + .03, y - Math.cos(a) * 6 / 64 + .03, hh - Math.sin(a) * 6, 3.4, 2.6, '#f5c42a'); }
-        blob(c, x + .04, y + .04, hh, 4.2, 4.2, '#6a4a2a');
+        for (let i = 0; i < 10; i++) { const a = i * .628; blob(c, x + Math.cos(a) * 6.5 / 45.25, y + Math.sin(a) * 6.5 / 45.25, hh - 1, 3.4, 2.6, '#f5c42a'); }
+        blob(c, x, y, hh + 1, 4.6, 4.2, '#6a4a2a');
       }
     },
   },
@@ -202,9 +204,7 @@ reg([
       shadow(c, .5, .5, .38, .1);
       for (const y of [.28, .5, .72]) for (let i = 0; i < 4; i++) {
         const X = .18 + i * .22;
-        for (const dx of [-2, 0, 2]) line3(c, [X, y, 0], [X + dx * 1.6 / 64, y - dx * 1.6 / 64, 10], o.season === 3 ? '#a0a08a' : '#7aa860', 1.8);
-        if (o.season === 3) continue;
-        for (const dx of [-2, 0, 2]) blob(c, X + dx * 1.6 / 64, y - dx * 1.6 / 64, 14, 1.8, 4.6, '#9a7ad8');
+        for (let j = 0; j < 3; j++) { const a = j * 2.1 + i, ox = Math.cos(a) * .045, oy = Math.sin(a) * .045; line3(c, [X, y, 0], [X + ox, y + oy, 10], o.season === 3 ? '#a0a08a' : '#7aa860', 2); if (o.season !== 3) blob(c, X + ox, y + oy, 14, 2, 4.6, '#9a7ad8'); }
       }
     },
   },

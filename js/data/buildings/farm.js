@@ -94,7 +94,7 @@ reg([
       plane(c, 0, (g) => { g.fillStyle = '#6a4a32'; g.beginPath(); g.roundRect(.06, .06, .88, .88, .2); g.fill(); g.strokeStyle = '#9ea1a8'; g.lineWidth = .08; g.stroke(); });
       const cols = [['#f08ac0', '#ffffff'], ['#f5d34a', '#f08a4a'], ['#8aa8f0', '#f0a8e0'], ['#ff7a6a', '#ffe08a'], ['#c3a6ee', '#ffffff']][b.v % 5];
       const pts = [[.3, .3], [.65, .28], [.5, .5], [.28, .68], [.7, .66]];
-      pts.forEach(([x, y], i) => { const h = 13 + (i % 2) * 3; line3(c, [x, y, 0], [x, y, h - 2], '#5da84e', 1.6); const cc = cols[i % 2]; for (let k = 0; k < 5; k++) { const a = k * 1.2566; blob(c, x + Math.cos(a) * 3 / 64, y - Math.cos(a) * 3 / 64, h - Math.sin(a) * 3, 2.3, 2.3, cc); } blob(c, x, y, h, 1.6, 1.6, '#f5a623'); });
+      pts.forEach(([x, y], i) => { const h = 13 + (i % 2) * 3; line3(c, [x, y, 0], [x, y, h - 2], '#5da84e', 1.6); const cc = cols[i % 2]; for (let k = 0; k < 5; k++) { const a = k * 1.2566; blob(c, x + Math.cos(a) * 3.2 / 45.25, y + Math.sin(a) * 3.2 / 45.25, h - 1, 2.4, 2.4, cc); } blob(c, x, y, h, 1.8, 1.8, '#f5a623'); });
     },
   },
   {
@@ -190,6 +190,7 @@ reg([
         const t0 = pt(0, 0, th), t1 = pt(54, 0, th);
         line3(c, [t0.w[0], t0.w[1], t0.w[2]], [t1.w[0], t1.w[1], t1.w[2]], '#7b5535', 3);
         poly(c, [pt(8, 1.5, th), pt(10, 15, th), pt(50, 15, th), pt(52, 1.5, th)], '#f3ead2');
+        for (const [u0, v0, u1, v1] of [[8, 1.5, 52, 1.5], [10, 15, 50, 15]]) { const a = pt(u0, v0, th), b2 = pt(u1, v1, th); line3(c, [a.w[0], a.w[1], a.w[2]], [b2.w[0], b2.w[1], b2.w[2]], '#d9cfb2', 2.4); }
       }
       blob(c, hub[0] + 1 * K * 8, hub[1] - 1 * K * 8, hub[2], 4.5, 4.5, '#5a3d26');
     },

@@ -77,7 +77,7 @@ export class Instancer {
           const im = new THREE.InstancedMesh(p.geo, p.mat, s.cap);
           im.frustumCulled = false; im.renderOrder = p.order || 0; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
           im.castShadow = p.mat === MAT.lit; im.receiveShadow = p.mat !== MAT.emi;
-          this.scene.add(im); return im;
+          im.userData.key = s.model.key; this.scene.add(im); return im;
         });
       } else if (!changed) continue;
       for (const im of s.meshes) { im.count = s.n; im.instanceMatrix.array.set(s.arr.subarray(0, s.n * 16)); im.instanceMatrix.needsUpdate = true; im.visible = s.n > 0; }

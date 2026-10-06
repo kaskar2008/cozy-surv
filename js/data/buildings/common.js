@@ -20,9 +20,9 @@ export function conduit(c, b, col, lw, joint, z = 1) {
 export function plant(c, crop, stage, x, y, col) {
   if (stage <= 0) return;
   const k = stage / 3, G1 = '#5fae4c', G2 = '#79c262', G0 = '#4a9a42';
-  const at = (dx) => [x + dx / 64, y - dx / 64];
+  const at = (dx) => { const m = dx / 45.25, a = Math.abs(dx) * .9 + 1; return [x + m * Math.cos(a), y + m * Math.sin(a)]; };   // по кругу — объёмно с любого угла
   const leaf = (dx, z, rx, ry, cc) => { const [a, b] = at(dx); blob(c, a, b, z, rx, ry, cc); };
-  const stem = (dx0, z0, dx1, z1, cc, lw) => { const [a0, b0] = at(dx0), [a1, b1] = at(dx1); line3(c, [a0, b0, z0], [a1, b1, z1], cc, lw); };
+  const stem = (dx0, z0, dx1, z1, cc, lw) => { const a = Math.abs(dx1) * .9 + 1, m0 = dx0 / 45.25, m1 = dx1 / 45.25; line3(c, [x + m0 * Math.cos(a), y + m0 * Math.sin(a), z0], [x + m1 * Math.cos(a), y + m1 * Math.sin(a), z1], cc, lw); };
   if (stage === 1) { leaf(-2, 2, 2.6, 1.8, G2); leaf(2, 3, 2.6, 1.8, G1); return; }
   switch (crop) {
     case 'carrot': case 'potato': case 'herb':
@@ -60,7 +60,7 @@ export function plant(c, crop, stage, x, y, col) {
     default: // цветы
       for (const [dx, hh, cc] of [[-4, 9, '#f08ac0'], [0, 13, '#f5d34a'], [4, 10, '#ffffff']]) {
         stem(dx, -1, dx, hh * k, G1, 1.4);
-        if (stage === 3) { for (let i = 0; i < 5; i++) { const a = i * 1.2566; leaf(dx + Math.cos(a) * 2.4, hh - Math.sin(a) * 2.4, 1.8, 1.8, cc); } leaf(dx, hh, 1.3, 1.3, '#f5a623'); }
+        if (stage === 3) { { const [fx, fy] = at(dx); for (let i = 0; i < 5; i++) { const a = i * 1.2566; blob(c, fx + Math.cos(a) * 2.4 / 45.25, fy + Math.sin(a) * 2.4 / 45.25, hh, 1.8, 1.8, cc); } blob(c, fx, fy, hh + .6, 1.4, 1.4, '#f5a623'); } }
         else leaf(dx, hh * k, 2, 1.5, G2);
       }
   }
