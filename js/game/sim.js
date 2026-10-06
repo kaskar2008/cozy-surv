@@ -16,6 +16,8 @@ import { computeCozy } from './cozy.js';
 import { checkGoals } from './goals.js';
 import { updatePets, updateNPC, updateEvents, onDayEvents } from './events.js';
 import { interiorStep } from './interior.js';
+import { addXp, bonus, COOKING } from './skills.js';
+import { updateFog } from './fog.js';
 
 const W_TABLE = [[.38, .22, .30, .10, 0], [.58, .20, .15, .07, 0], [.28, .24, .30, .18, 0], [.34, .20, 0, .10, .36]];
 const W_TYPES = ['clear', 'cloudy', 'rain', 'fog', 'snow'];
@@ -39,7 +41,7 @@ function stepSim(dt) {
   if (season() !== ps) onNewSeason();
   weather(dt); sky(dt); needs(dt);
   netsStep(dt); buildingsStep(dt); nodesStep(dt);
-  updatePlayer(dt);
+  updatePlayer(dt); updateFog();
   interiorStep(dt);
   updatePets(dt); updateNPC(dt); updateEvents(dt);
   acc.cozy += dt; acc.goals += dt;
@@ -55,9 +57,10 @@ function rollWeather() {
 }
 function weather(dt) {
   const w = G.weather, wx = G.wx;
+  if (!w.next) w.next = rollWeather();   // следующая погода известна заранее (прогноз «Звёздочёта»)
   w.left -= dt;
   if (w.left <= 0) {
-    const prev = w.type; w.type = rollWeather(); w.left = rnd(70, 170);
+    const prev = w.type; w.type = w.next; w.next = rollWeather(); w.left = rnd(70, 170);
     if (w.type !== prev) {
       if (W_MSG[w.type]) toast(W_MSG[w.type]);
       if (prev === 'rain' && (w.type === 'clear' || w.type === 'cloudy') && darkness() < .3 && season() < 3 && chance(.7)) { G.sky.rainbow = 1.2; toast('Радуга! 🌈 Загляни в небо'); addBuff('mood', 10, 150); stat('rainbows'); }
@@ -194,7 +197,17 @@ export function updateStation(b, def, dt) {
   for (const k in r.out) eco.add(k, r.out[k]);
   fx.floatText(b.x + b.w / 2, b.y + b.d / 2, Object.entries(r.out).map(([k, v]) => `+${v}${itemIcon(k)}`).join(' '), '#fff6d0', 50);
   fx.sparkle(b.x + b.w / 2, b.y + b.d / 2, 40, '#fff6b0', 5);
-  if (r.mood) addBuff('mood', r.mood, 200);
+  if (r.mood) addBuff('mood', Math.round(r.mood * (cur.st === 'easel' ? 1 + bonus('art', 'paint') : 1)), 200);
+  if (COOKING.has(cur.st)) {
+    addXp('cook', 3 + Math.round(r.t / 8));
+    if (chance(bonus('cook', 'master'))) {
+      for (const k in r.out) eco.add(k, 1);
+      if (!r.mood) addBuff('mood', 8, 200);
+      fx.floatText(b.x + b.w / 2, b.y + b.d / 2, 'Шедевр! ✨ +1', '#ffe9a0', 66); fx.sparkle(b.x + b.w / 2, b.y + b.d / 2, 50, '#ffd36a', 8);
+    }
+  }
+  if (cur.st === 'workbench') addXp('carp', 2);
+  if (cur.st === 'easel') addXp('art', 6);
   const outKey = Object.keys(r.out)[0];
   stat('crafted'); if (['campfire', 'pot', 'kettle', 'oven', 'stove', 'ferment', 'smoker', 'drying'].includes(cur.st)) { stat('cooked'); (G.stats.cookedItems ||= {})[outKey] = 1; }
   if (cur.st === 'easel') stat('paintings');
@@ -205,16 +218,16 @@ function updateCrops(b, def, dt) {
   const gh = def.tags.includes('greenhouse'), s = season(), rainy = G.weather.type === 'rain';
   b._sc = (b._sc || 0) - dt;
   if (b._sc <= 0) { b._sc = 4; b._scare = scarecrowsNear(b).length ? 1.1 : 1; }
-  const wet = G.comp.water.has(b.id);
+  const wet = G.comp.water.has(b.id), skGrow = 1 + bonus('garden', 'grow'), skDry = 1 - bonus('garden', 'dry');
   if (b._cc === undefined || (b._cc -= dt) <= 0) { b._cc = 3; b._comp = compostsNear(b); }
   for (const p of b.st.plots) {
     if (p.crop && !p.fert && b._comp.length) { const o = b._comp.find((c) => G.bMap.get(c.id) === c && c.st.ready > 0); if (o) { o.st.ready--; p.fert = 1; fx.floatText(b.x + b.w / 2, b.y + b.d / 2, 'Удобрено 🟤', '#cfe8a0', 40); fx.sparkle(b.x + b.w / 2, b.y + b.d / 2, 14, '#cfe8a0'); } }
     if (!p.crop) { p.moist = Math.max(0, p.moist - dt * .0008); continue; }
     if (rainy && !gh) p.moist = Math.min(1, p.moist + dt * .03);
-    p.moist = Math.max(0, p.moist - dt * .0024 / (def.bonus ? 1.15 : 1) * (s === 1 ? 1.3 : 1));
+    p.moist = Math.max(0, p.moist - dt * .0024 * skDry / (def.bonus ? 1.15 : 1) * (s === 1 ? 1.3 : 1));
     if (p.moist < .5 && wet) { const n = netOf(b, 'water'); if (n && n.stock >= 1) { netTake(b, 'water', 1); p.moist = 1; } }
     if (p.prog < 1 && p.moist > .05) {
-      const rate = growMult(p.crop, s, gh) * (def.bonus || 1) * (p.fert ? 1.15 : 1) * (b._scare || 1) / CROPS[p.crop].grow;
+      const rate = growMult(p.crop, s, gh) * skGrow * (def.bonus || 1) * (p.fert ? 1.15 : 1) * (b._scare || 1) / CROPS[p.crop].grow;
       p.prog = Math.min(1, p.prog + dt * rate);
     }
   }
@@ -228,9 +241,9 @@ function updateProducer(b, def, dt) {
   }
   if (!o.needs || (st.feedT > 0 && st.waterT > 0)) {
     if (st.stock < o.max) {
-      let speed = 1; if (def.tags.includes('hive')) speed = .5 + Math.min(2, flowersNear(b, 6) * .2);
+      let speed = 1; if (def.tags.includes('hive')) speed = .5 + Math.min(2, flowersNear(b, 6) * .2); if (def.animals) speed *= 1 + bonus('animals', 'prod');
       st.t += dt * speed;
-      if (st.t >= o.every) { st.t = 0; st.stock++; if (o.bonus) for (const k in o.bonus) if (chance(o.bonus[k])) eco.add(k, 1); }
+      if (st.t >= o.every) { st.t = 0; st.stock++; if (def.animals) { addXp('animals', 1); if (chance(bonus('animals', 'extra'))) st.stock++; } if (o.bonus) for (const k in o.bonus) if (chance(o.bonus[k])) eco.add(k, 1); }
     }
   }
   if (st.stock >= 1 && b.nb.some((n) => BDEF[n.t].tags.includes('storage'))) {

@@ -1,5 +1,6 @@
 // Частицы, всплывающие подписи и «живность» вокруг: бабочки, светлячки, птицы.
 import { G, N, season, darkness } from '../game/state.js';
+import { exploredNear } from '../game/fog.js';
 import { cam, worldToScreen, viewTiles } from './camera.js';
 const proj = (x, y, z) => worldToScreen(x, y, z);
 import { rnd, pick } from '../core/util.js';
@@ -59,12 +60,12 @@ export function ambient(dt, t, w) {
     const x = rnd(Math.max(1, v.x0 + 3), Math.min(N - 1, v.x1 - 3)), y = rnd(Math.max(1, v.y0 + 3), Math.min(N - 1, v.y1 - 3));
     bflies.push({ x, y, a: rnd(0, 6.28), life: rnd(14, 30), col: pick(['#f6a8c8', '#f8e07a', '#9ac8f6', '#ffffff', '#f7a05a']) });
   }
-  for (let i = bflies.length - 1; i >= 0; i--) { const b = bflies[i]; b.life -= dt; b.a += (Math.random() - .5) * dt * 5; b.x += Math.cos(b.a) * dt * .8; b.y += Math.sin(b.a) * dt * .8; if (b.life <= 0 || dark > .5) bflies.splice(i, 1); }
+  for (let i = bflies.length - 1; i >= 0; i--) { const b = bflies[i]; b.life -= dt; b.a += (Math.random() - .5) * dt * 5; b.x += Math.cos(b.a) * dt * .8; b.y += Math.sin(b.a) * dt * .8; if (b.life <= 0 || dark > .5 || !exploredNear(b.x, b.y)) bflies.splice(i, 1); }
   // светлячки
   if (dark > .6 && (s === 1 || s === 0) && w !== 'rain' && flies.length < 26 && Math.random() < dt * 4) {
     flies.push({ x: rnd(Math.max(1, v.x0 + 2), Math.min(N - 1, v.x1 - 2)), y: rnd(Math.max(1, v.y0 + 2), Math.min(N - 1, v.y1 - 2)), a: rnd(0, 6.28), life: rnd(8, 16), z: rnd(8, 40), ph: rnd(0, 6) });
   }
-  for (let i = flies.length - 1; i >= 0; i--) { const f = flies[i]; f.life -= dt; f.a += (Math.random() - .5) * dt * 3; f.x += Math.cos(f.a) * dt * .35; f.y += Math.sin(f.a) * dt * .35; if (f.life <= 0 || dark < .3) flies.splice(i, 1); }
+  for (let i = flies.length - 1; i >= 0; i--) { const f = flies[i]; f.life -= dt; f.a += (Math.random() - .5) * dt * 3; f.x += Math.cos(f.a) * dt * .35; f.y += Math.sin(f.a) * dt * .35; if (f.life <= 0 || dark < .3 || !exploredNear(f.x, f.y)) flies.splice(i, 1); }
   // птицы (тень пролетает по земле)
   tBird -= dt;
   if (tBird < 0 && dark < .4 && w !== 'rain') { tBird = rnd(25, 60); const y = rnd(5, N - 5); birds.push({ x: -4, y, vx: rnd(1.6, 2.4), n: 3 + Math.floor(rnd(0, 3)), ph: rnd(0, 6) }); }

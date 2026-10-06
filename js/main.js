@@ -27,6 +27,7 @@ import { toast } from './ui/ui.js';
 import { initInput, updateInput } from './input.js';
 import { UI } from './ui/state.js';
 import * as api from './game/api.js';
+import * as skills from './game/skills.js';
 import { prof, mark, now, hooks } from './core/prof.js';
 
 const canvas = document.getElementById('game'), overlay = document.getElementById('overlay'), ctx = overlay.getContext('2d');
@@ -106,7 +107,7 @@ async function boot() {
     const intro = () => openIntro(() => { delete G.noSave; setSpeed(1); save(); });
     picker ? chooseStorage(intro) : intro();
   }
-  window.cozy = { gl, enterHome, exitHome, placeFurn, furnActions, removeFurn, FDEF, worldToScreen, screenToWorld, rotateCam, quality: () => quality, G, S, api, BDEF, cam, R, UI, save, load, prof, syncProf: (on) => { hooks.sync = on ? () => ctx.getImageData(0, 0, 1, 1) : null; } };
+  window.cozy = { skills, gl, enterHome, exitHome, placeFurn, furnActions, removeFurn, FDEF, worldToScreen, screenToWorld, rotateCam, quality: () => quality, G, S, api, BDEF, cam, R, UI, save, load, prof, syncProf: (on) => { hooks.sync = on ? () => ctx.getImageData(0, 0, 1, 1) : null; } };
   requestAnimationFrame(frame);
 }
 boot();

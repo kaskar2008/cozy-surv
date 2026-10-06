@@ -1,4 +1,5 @@
 // Рецепты по станциям. in/out — предметы, t — секунд работы.
+// sk: [навык, уровень] — рецепт открывается с уровня навыка (см. data/skills.js).
 // heat: станция должна стоять рядом с горящим огнём; в `in` вода берётся из сети труб (если станция подключена) или из инвентаря.
 const R = (out, inn, t, extra = {}) => ({ out, in: inn, t, ...extra });
 export const STATIONS = {
@@ -45,6 +46,9 @@ export const STATIONS = {
     R({ berry_pie: 1 }, { berries: 4, flour: 1, honey: 1, wood: 1 }, 24),
     R({ pizza: 1 }, { flour: 1, tomato: 2, cheese: 1, wood: 1 }, 26),
     R({ cake: 1 }, { flour: 2, egg: 2, strawberry: 2, honey: 1, wood: 1 }, 30),
+    R({ herb_bun: 2 }, { flour: 1, herbs: 2, water: 1, wood: 1 }, 20, { sk: ['cook', 3] }),
+    R({ fish_pie: 1 }, { flour: 1, fish: 2, potato: 1, wood: 1 }, 26, { sk: ['cook', 6] }),
+    R({ pumpkin_pie: 1 }, { pumpkin: 1, flour: 1, milk: 1, honey: 1, wood: 1 }, 28, { sk: ['cook', 8] }),
   ], water: true },
   stove: { name: 'Плита', icon: '🍳', water: true, recipes: [
     R({ omelet: 1 }, { egg: 2, milk: 1, wood: 1 }, 10),

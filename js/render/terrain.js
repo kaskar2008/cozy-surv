@@ -6,6 +6,7 @@ import { shade, hash2 } from '../core/util.js';
 import { Builder, rgba, cone, blob, setSwap } from '../core/iso.js';
 import { MAT, geoFrom } from './models.js';
 import { cam, worldToScreen, viewTiles } from './camera.js';
+import { exploredNear } from '../game/fog.js';
 
 const PAL = {
   [T.GRASS]: ['#93cc62', '#80bd55', '#b0b04e', '#e6eff2'],
@@ -104,7 +105,7 @@ export function drawSparkles(c, t) {
   c.lineCap = 'round'; c.lineWidth = 1.6 * Math.max(.7, k);
   const paths = [new Path2D(), new Path2D(), new Path2D(), new Path2D()]; let any = false;
   for (const s of sparkles) {
-    if (s.x < v.x0 || s.x > v.x1 || s.y < v.y0 || s.y > v.y1) continue;
+    if (s.x < v.x0 || s.x > v.x1 || s.y < v.y0 || s.y > v.y1 || !exploredNear(s.x, s.y)) continue;
     const a = 0.18 + 0.2 * Math.sin(t * 1.3 + s.ph); if (a < 0.1) continue;
     const q = Math.min(3, Math.floor((a - 0.1) / 0.075)), [X, Y] = worldToScreen(s.x, s.y, WATER_Y * 39.19 + 1);
     paths[q].moveTo(X - 7 * k, Y); paths[q].lineTo(X + 6 * k, Y); any = true;

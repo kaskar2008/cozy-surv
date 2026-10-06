@@ -186,3 +186,14 @@ body.touch .bb-handle { width: 120px; height: 34px; top: -34px; }
 .inp { font: inherit; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--line); background: #fff; color: var(--ink); -webkit-user-select: text; user-select: text; } .inp:focus { outline: 2px solid var(--accent2); }
 .auth-msg { min-height: 1.3em; margin: 0; font-size: 14px; color: var(--red); } .auth-msg.ok { color: var(--green); }
 button.link { border: 0; background: transparent; box-shadow: none !important; color: var(--ink2); text-decoration: underline; padding: 2px 6px; font-size: 14px; }
+
+/* навыки */
+.skills { display: flex; flex-direction: column; gap: 8px; }
+.sk { padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, .55); border: 1px solid var(--line); }
+.sk-top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; } .sk-ic { font-size: 26px; }
+.sk-t { flex: 1; min-width: 0; } .sk-t small { display: block; color: var(--ink2); }
+.sk-lv { font-weight: 700; font-size: 14px; white-space: nowrap; }
+.sk .bar { height: 10px; } .sk-xp { display: block; margin-top: 3px; color: var(--ink2); }
+.sk-eff { margin: 6px 0 2px; padding-left: 18px; font-size: 13px; } .sk-eff li.dim { color: var(--ink2); opacity: .75; }
+.sk-next { display: block; margin-top: 4px; font-size: 12.5px; color: #8a6a2a; }
+small.lock { color: #b0652a; font-weight: 600; }

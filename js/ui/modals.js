@@ -18,6 +18,9 @@ import { openCloudMenu } from './cloud.js';
 import { isMuted, setMuted, initAudio } from '../core/audio.js';
 import { UI } from './state.js';
 import { buffSum } from '../game/api.js';
+import { SKILLS, SKILL_IDS, MAX_LVL, CONSTS } from '../data/skills.js';
+import { levelOf, progressOf, recipeLock, lockText } from '../game/skills.js';
+import { exploredPct } from '../game/fog.js';
 
 export function openInventory() {
   const body = h('div', { class: 'inv' });
@@ -128,7 +131,8 @@ function recipesView() {
       h('div', { class: 'rc-body' },
         h('b', null, title),
         h('div', null, ...Object.entries(r.in).map(([k, n]) => h('span', { class: 'chip ' + (eco.count(k) >= n ? '' : 'miss') }, `${n}${itemIcon(k)} ${itemName(k)}`))),
-        r.once || r.mood ? h('small', null, [r.once ? 'делается один раз' : '', r.mood ? `+${r.mood} к настроению` : ''].filter(Boolean).join(' · ')) : null),
+        r.once || r.mood ? h('small', null, [r.once ? 'делается один раз' : '', r.mood ? `+${r.mood} к настроению` : ''].filter(Boolean).join(' · ')) : null,
+        recipeLock(r) ? h('small', { class: 'lock' }, '🔒 откроется с навыком: ' + lockText(r)) : null),
       h('span', { class: 'rc-t' }, `${r.t} с`));
   });
   const out = [h('p', { class: 'muted' }, 'Все рецепты острова по местам, где их готовят. Красные цифры показывают, чего сейчас не хватает в рюкзаке.')];
@@ -146,17 +150,49 @@ function recipesView() {
   return out;
 }
 
+// ---------------------------------------------------------------- навыки
+function nextReward(id, lvl) {
+  const s = SKILLS[id];
+  for (let l = lvl + 1; l <= MAX_LVL; l++) {
+    const parts = [];
+    if (s.gifts?.[l]) parts.push('подарок ' + Object.entries(s.gifts[l]).map(([k, v]) => `${v}${itemIcon(k)}`).join(' '));
+    if (s.perks?.[l]) parts.push(s.perks[l]);
+    for (const st of Object.values(STATIONS)) for (const r of st.recipes) if (r.sk && r.sk[0] === id && r.sk[1] === l) parts.push('рецепт: ' + (r.name || Object.keys(r.out).map(itemName).join(', ')));
+    if (parts.length) return `Ур. ${l}: ${parts.join(' · ')}`;
+  }
+  return null;
+}
+function skillsView() {
+  const total = SKILL_IDS.reduce((a, id) => a + levelOf(id), 0);
+  const out = [h('p', { class: 'muted' }, `Навыки растут сами — от того, чем ты занимаешься. Никаких очков и веток: просто становишься ловчее. Сумма уровней: ${total} из ${SKILL_IDS.length * MAX_LVL}.`)];
+  const list = h('div', { class: 'skills' });
+  for (const id of SKILL_IDS) {
+    const s = SKILLS[id], pr = progressOf(id), lvl = pr.lvl, nr = nextReward(id, lvl);
+    list.append(h('div', { class: 'sk' },
+      h('div', { class: 'sk-top' }, h('span', { class: 'sk-ic' }, s.ic), h('div', { class: 'sk-t' }, h('b', null, s.n), h('small', null, s.how)), h('span', { class: 'sk-lv' }, lvl >= MAX_LVL ? 'Макс. ★' : `Ур. ${lvl}`)),
+      h('div', { class: 'bar' }, h('i', { style: `width:${Math.max(2, pr.p * 100)}%;background:${s.col}` })),
+      h('small', { class: 'sk-xp' }, lvl >= MAX_LVL ? 'Мастер своего дела' : `${pr.cur} / ${pr.need} опыта до уровня ${lvl + 1}`),
+      h('ul', { class: 'sk-eff' }, ...s.eff.map((e) => h('li', { class: lvl ? '' : 'dim' }, lvl ? e.t(e.per * lvl) : e.t(e.per) + ' за уровень'))),
+      id === 'astro' && lvl >= 6 ? h('small', { class: 'sk-xp' }, `🌌 Найдено созвездий: ${(G.flags.consts || []).length} из ${CONSTS.length}`) : null,
+      nr ? h('small', { class: 'sk-next' }, '🎁 ' + nr) : null));
+  }
+  out.push(list);
+  return out;
+}
+
 export function openJournal(tab = 'goals', focus) {
   const body = h('div', { class: 'journal' });
   const tabs = h('div', { class: 'tabs' });
   const content = h('div', { class: 'jcontent' });
   const draw = (t) => {
-    tabs.replaceChildren(...[['goals', '🎯 Цели'], ['cozy', '🧸 Уют'], ['recipes', '📜 Рецепты'], ['help', '❓ Подсказки']].map(([id, nm]) => h('button', { class: id === t ? 'on' : '', onclick: () => draw(id) }, nm)));
+    tabs.replaceChildren(...[['goals', '🎯 Цели'], ['skills', '🌟 Навыки'], ['cozy', '🧸 Уют'], ['recipes', '📜 Рецепты'], ['help', '❓ Подсказки']].map(([id, nm]) => h('button', { class: id === t ? 'on' : '', onclick: () => draw(id) }, nm)));
     content.replaceChildren();
     if (t === 'goals') {
       const done = GOALS.filter((g) => G.goals[g.id]).length;
-      content.append(h('p', { class: 'muted' }, `Выполнено ${done} из ${GOALS.length}. Никакой спешки: цели — просто идеи, чем заняться. За каждую — небольшой подарок.`),
+      content.append(h('p', { class: 'muted' }, `🧭 Разведано острова: ${Math.floor(exploredPct() * 100)}%. Выполнено ${done} из ${GOALS.length}. Никакой спешки: цели — просто идеи, чем заняться. За каждую — небольшой подарок.`),
         h('div', { class: 'goals' }, ...GOALS.map((g) => h('div', { 'data-id': g.id, class: 'goal' + (G.goals[g.id] ? ' done' : '') }, h('span', { class: 'gi' }, G.goals[g.id] ? '✅' : g.ic), h('div', null, h('b', null, g.name), h('small', null, g.desc)), h('em', null, Object.entries(g.reward).map(([k, v]) => `${v}${itemIcon(k)}`).join(' '))))));
+    } else if (t === 'skills') {
+      content.append(...skillsView());
     } else if (t === 'cozy') {
       const lv = cozyLevel(G.cozy.total);
       content.append(h('div', { class: 'cz-big' }, h('div', { class: 'num' }, G.cozy.total), h('div', null, h('b', null, lv.name), h('small', null, `снаружи ${G.cozy.out} · внутри ${G.cozy.inn}${lv.next ? ` · до следующего уровня: ${lv.next - G.cozy.total}` : ''}`))),

@@ -23,6 +23,7 @@ import { drawWeather } from '../render/weather.js';
 import { R, roots, showGhost, hideGhosts, dia } from '../render/scene.js';
 import { setOutline, renderOutline } from '../render/outline.js';
 import { updateStation } from './sim.js';
+import { addXp, bonus } from './skills.js';
 
 S.furnDef = (id) => FDEF[id];
 export const homeOf = () => (G.scene === 'world' ? null : G.bMap.get(G.scene) || null);
@@ -119,7 +120,7 @@ export function placeFurn(home, def, x, y, rot, wall) {
   if (def.wall) { it.w = def.size[0]; it.d = 1; }
   if (def.burner) { it.st.fuel = 0; it.st.lit = false; }
   home.in.items.push(it);
-  G.built[def.id] = (G.built[def.id] || 0) + 1; stat('furn');
+  G.built[def.id] = (G.built[def.id] || 0) + 1; stat('furn'); if (def.cozy) addXp('art', .5);
   rebuildInterior(home);
   const p = G.player; if (!isSeated() && G.interior.blocked(Math.floor(p.x), Math.floor(p.y))) nudgePlayer();
   it.pop = performance.now() / 1000; sfx('place'); fx.dust(x + it.w / 2, y + it.d / 2, 6);
@@ -254,7 +255,7 @@ export function furnActions(home, it) {
     if (!roomLit(home)) { toast('Темновато читать — зажги лампу или свечу', 'warn'); return; }
     goItem(home, it, 'Читаю', d.read.dur, 'read', () => { let m = d.read.mood; if (G.cozy.list.some((l) => l.id === 'reading_nook')) m += 6; addBuff('mood', m, 240); stat('read'); fx.sparkle(G.player.x, G.player.y, 30, '#fff6b0', 5); sfx('chime'); });
   });
-  if (d.play) A('Играть музыку', () => goItem(home, it, 'Играю', d.play.dur, 'read', () => { addBuff('mood', d.play.mood, 300); stat('played'); sfx('chime'); for (let i = 0; i < 6; i++) setTimeout(() => fx.note(it.x + .5, it.y + .5, 40), i * 250); }));
+  if (d.play) A('Играть музыку', () => goItem(home, it, 'Играю', d.play.dur, 'read', () => { addBuff('mood', Math.round(d.play.mood * (1 + bonus('art', 'play'))), 300); stat('played'); addXp('art', 3); sfx('chime'); for (let i = 0; i < 6; i++) setTimeout(() => fx.note(it.x + .5, it.y + .5, 40), i * 250); }));
   if (d.diary) A('Записать мысли в дневник', () => goItem(home, it, 'Пишу', 8, 'read', () => { addBuff('mood', 14, 240); stat('diary'); toast(pick(DIARY)); sfx('chime'); }));
   if (d.wardrobe) A('Переодеться…', () => S.hooks.openWardrobe && S.hooks.openWardrobe());
   if (d.bath) A('Принять ванну', () => {

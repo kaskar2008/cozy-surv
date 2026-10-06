@@ -6,6 +6,7 @@ import { SEASONS, SEASON_ICON } from '../data/crops.js';
 import { ITEMS, itemIcon } from '../data/items.js';
 import * as eco from '../game/eco.js';
 import { cozyLevel } from '../game/cozy.js';
+import { forecastOn } from '../game/skills.js';
 import { nextGoals } from '../game/goals.js';
 import { UI } from './state.js';
 import { toast } from './ui.js';
@@ -45,6 +46,7 @@ export function buildHUD() {
       h('button', { title: 'Рюкзак (I)', onclick: openInventory }, '🎒'),
       h('button', { title: 'Крафт (C)', onclick: openCraft }, '🛠️'),
       h('button', { title: 'Журнал: цели, уют, рецепты (J)', onclick: () => openJournal('goals') }, '📖'),
+      h('button', { title: 'Навыки (K)', onclick: () => openJournal('skills') }, '🌟'),
       h('button', { title: 'Сфотографировать (F)', onclick: takePhoto }, '📷'),
       h('button', { id: 'mute-btn', title: 'Звук (M)', onclick: () => { initAudio(); setMuted(!isMuted()); syncMute(); } }, '🔊'),
       h('button', { title: 'Меню (Esc)', onclick: openMenu }, '⚙️')),
@@ -62,7 +64,8 @@ export function updateHUD(dt) {
   acc += dt; if (acc < .2) return; acc = 0;
   for (const b of document.querySelectorAll('#menu-btns .rot')) b.style.display = G.scene === 'world' ? '' : 'none';
   els.season.textContent = `${SEASON_ICON[season()]} ${SEASONS[season()]}`; els.day.textContent = `День ${day() + 1}`; els.clock.textContent = fmtClock();
-  els.wx.textContent = WX[G.weather.type]; els.wx.title = { clear: 'Ясно', cloudy: 'Облачно', rain: 'Дождь', fog: 'Туман', snow: 'Снег' }[G.weather.type];
+  const WN = { clear: 'Ясно', cloudy: 'Облачно', rain: 'Дождь', fog: 'Туман', snow: 'Снег' }, nx = forecastOn() && G.weather.next;
+  els.wx.textContent = WX[G.weather.type] + (nx && nx !== G.weather.type ? ' → ' + WX[nx] : ''); els.wx.title = WN[G.weather.type] + (nx ? ` · дальше: ${WN[nx]}` : '');
   syncSpeed();
   document.querySelectorAll('.need').forEach((n) => { const k = n.dataset.k, v = G.needs[k]; n.querySelector('i').style.width = Math.max(2, v) + '%'; n.style.setProperty('--v', Math.max(.04, v / 100)); n.style.setProperty('--c', NEEDS.find((x) => x[0] === k)[3]); n.classList.toggle('low', v < 22); n.title = `${n.title.split(':')[0]}: ${Math.round(v)}`; });
   const lv = cozyLevel(G.cozy.total);

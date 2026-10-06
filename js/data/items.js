@@ -82,6 +82,10 @@ export const ITEMS = {
   salad: { n: 'Салат', ic: '🥗', c: 'meal', e: { h: 26, t: 8, m: 6 } },
   jam: { n: 'Варенье', ic: '🫙', c: 'meal', e: { h: 14, m: 12 } },
   sauerkraut: { n: 'Квашеная капуста', ic: '🥒', c: 'meal', e: { h: 18, m: 4 } },
+  // блюда, которые открывает навык «Кулинария» (рецепты помечены sk в recipes.js)
+  herb_bun: { n: 'Булочка с травами', ic: '🥐', c: 'meal', e: { h: 48, m: 10 } },
+  fish_pie: { n: 'Рыбный пирог', ic: '🥧', c: 'meal', e: { h: 62, m: 16, w: 12 } },
+  pumpkin_pie: { n: 'Тыквенный пирог', ic: '🎃', c: 'meal', e: { h: 52, m: 34 } },
   smoked_fish: { n: 'Копчёная рыба', ic: '🍣', c: 'meal', e: { h: 40, m: 7 } },
   // вода и инструменты
   water: { n: 'Вода', ic: '💧', c: 'drink', e: { t: 32, m: 1 } },

@@ -1,6 +1,7 @@
 // Сохранение: всегда в localStorage (кеш), а в облачном режиме ещё и в Firestore (см. cloud.js).
 import { G, N, DAY } from './state.js';
-import { rebuildOcc } from './world.js';
+import { rebuildOcc, T } from './world.js';
+import { hash2 } from '../core/util.js';
 import { b64, unb64 } from '../core/util.js';
 import * as cloud from './cloud.js';
 
@@ -27,8 +28,8 @@ export function save() {
   try {
     const data = {
       ver: 1, savedAt: Date.now(), day: dayOf(), dayLen: DAY, seed: G.seed, t: G.t, inv: G.inv, needs: G.needs, buffs: G.buffs, weather: G.weather, wx: G.wx, sky: { rainbow: G.sky.rainbow, aurora: G.sky.aurora, star: null },
-      stats: G.stats, goals: G.goals, flags: G.flags, built: G.built, pets: G.pets, mail: G.mail, uid: G.uid, nid: G.nid, bid: G.bid, speed: G.speed,
-      tiles: b64(G.tiles), shd: b64(G.shd), det: b64(G.det),
+      stats: G.stats, skills: G.skills, goals: G.goals, flags: G.flags, built: G.built, pets: G.pets, mail: G.mail, uid: G.uid, nid: G.nid, bid: G.bid, speed: G.speed,
+      N, tiles: b64(G.tiles), shd: b64(G.shd), det: b64(G.det), fog: b64(G.fog),
       nodes: [...G.nodeMap.values()], blds: [...G.bMap.values()],
       player: { ...G.player, path: [], work: null, fx: null, sleeping: false },
       inPos: G.scene !== 'world' ? G.outPos : null, scene: G.scene,
@@ -39,18 +40,38 @@ export function save() {
     return true;
   } catch (e) { console.warn('save failed', e); return false; }
 }
+// Сохранение со старого острова (меньшего размера): кладём его в центр нового, вокруг — открытое море.
+// Весь старый остров считается разведанным, туман остаётся только над морем вокруг.
+function migrate(d) {
+  const o = d.N || 56;
+  if (o === N) { if (!d.fog) d.fog = b64(new Uint8Array(N * N).fill(1)); return d; }
+  const off = Math.floor((N - o) / 2), ot = unb64(d.tiles), os = unb64(d.shd), od = unb64(d.det);
+  const tiles = new Uint8Array(N * N).fill(T.WATER), shd = new Uint8Array(N * N), det = new Uint8Array(N * N), fog = new Uint8Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) shd[y * N + x] = Math.floor(hash2(x, y, d.seed + 11) * 8) % 3;
+  for (let y = 0; y < o; y++) for (let x = 0; x < o; x++) {
+    const i = y * o + x, j = (y + off) * N + x + off;
+    tiles[j] = ot[i]; shd[j] = os[i]; det[j] = od[i]; fog[j] = 1;
+  }
+  const mv = (e) => { if (!e) return; if (typeof e.x === 'number') e.x += off; if (typeof e.y === 'number') e.y += off; if (typeof e.tx === 'number') e.tx += off; if (typeof e.ty === 'number') e.ty += off; };
+  for (const n of d.nodes || []) mv(n);
+  for (const b of d.blds || []) mv(b);
+  for (const p of d.pets || []) mv(p);
+  if (!d.scene || d.scene === 'world') { mv(d.player); mv(d.player?.restPos); }   // внутри дома координаты персонажа — комнатные
+  mv(d.inPos);
+  return { ...d, N, tiles: b64(tiles), shd: b64(shd), det: b64(det), fog: b64(fog) };
+}
 export function load(raw) {
   try {
     if (raw == null) { const k = storeKey(); raw = k && localStorage.getItem(k); }
     if (!raw) return false;
-    const d = JSON.parse(raw);
+    const d = migrate(JSON.parse(raw));
     for (const k of Object.keys(G)) delete G[k];
     Object.assign(G, {
       ver: d.ver, seed: d.seed, N, t: d.t * DAY / (d.dayLen || 300), inv: d.inv, capBonus: {}, needs: d.needs, buffs: d.buffs || [], weather: d.weather, wx: d.wx || { rain: 0, snow: 0, fog: 0, cloud: 0 }, sky: { rainbow: 0, aurora: 0, star: null, ...(d.sky || {}), star: null },
-      stats: d.stats || {}, goals: d.goals || {}, flags: d.flags || {}, built: d.built || {}, pets: d.pets || [], npc: null, mail: d.mail || [], uid: d.uid || 1, scene: 'world', speed: d.speed ?? 1,
+      stats: d.stats || {}, skills: d.skills || {}, goals: d.goals || {}, flags: d.flags || {}, built: d.built || {}, pets: d.pets || [], npc: null, mail: d.mail || [], uid: d.uid || 1, scene: 'world', speed: d.speed ?? 1,
       cozy: { total: 0, out: 0, inn: 0, list: [] },
       player: { ...d.player, path: [], work: null, fx: null, sleeping: false, moving: false },
-      tiles: unb64(d.tiles), shd: unb64(d.shd), det: unb64(d.det),
+      tiles: unb64(d.tiles), shd: unb64(d.shd), det: unb64(d.det), fog: unb64(d.fog), fogVer: 1,
       nid: d.nid, bid: d.bid, nodeMap: new Map(), bMap: new Map(), nAt: new Int32Array(N * N), bAt: new Int32Array(N * N), blk: new Uint8Array(N * N),
       dirtyBlk: true, dirtyLinks: true,
     });

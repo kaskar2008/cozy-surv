@@ -9,6 +9,7 @@ import { NDEF } from './data/nodes.js';
 import { FDEF } from './data/furniture.js';
 import { HW, HH } from './core/iso.js';
 import { T, inB, tileAt, bldAt, nodeAt } from './game/world.js';
+import { explored } from './game/fog.js';
 import * as api from './game/api.js';
 import * as eco from './game/eco.js';
 import * as pl from './game/player.js';
@@ -181,6 +182,7 @@ function onKey(e) {
     case 'c': openCraft(); break;
     case 'i': openInventory(); break;
     case 'j': openJournal(); break;
+    case 'k': openJournal('skills'); break;
     case 'm': initAudio(); setMuted(!isMuted()); document.getElementById('mute-btn').textContent = isMuted() ? '🔇' : '🔊'; break;
     case 'p': setSpeed(G.speed === 0 ? 1 : 0); break;
     case '1': setSpeed(1); break;
@@ -258,11 +260,11 @@ function afterPlace() {
 
 // ---------------------------------------------------------------- выбор объектов
 function pickWorld(mx, my) {
-  for (const p of G.pets) { if (p.in) continue; const [sx, sy] = worldToScreen(p.x, p.y, 10); if (Math.hypot(sx - mx, sy - my) < 20 * cam.zoom) return { kind: 'pet', pet: p }; }
-  if (G.npc) { const [sx, sy] = worldToScreen(G.npc.x, G.npc.y, 18); if (Math.hypot(sx - mx, sy - my) < 26 * cam.zoom) return { kind: 'npc' }; }
+  for (const p of G.pets) { if (p.in || !explored(Math.floor(p.x), Math.floor(p.y))) continue; const [sx, sy] = worldToScreen(p.x, p.y, 10); if (Math.hypot(sx - mx, sy - my) < 20 * cam.zoom) return { kind: 'pet', pet: p }; }
+  if (G.npc && explored(Math.floor(G.npc.x), Math.floor(G.npc.y))) { const [sx, sy] = worldToScreen(G.npc.x, G.npc.y, 18); if (Math.hypot(sx - mx, sy - my) < 26 * cam.zoom) return { kind: 'npc' }; }
   for (const z of [0, 16, 34, 54, 76]) {
     const [wx, wy] = screenToWorld(mx, my, z), tx = Math.floor(wx), ty = Math.floor(wy);
-    if (!inB(tx, ty)) continue;
+    if (!inB(tx, ty) || !explored(tx, ty)) continue;   // в тумане ничего не выбрать
     const b = bldAt(tx, ty);
     if (b) { const def = BDEF[b.t]; if ((!def.flat || z === 0) && (def.ph ?? def.h) + 12 >= z) return { kind: 'bld', b }; }
     const n = nodeAt(tx, ty);
@@ -290,6 +292,7 @@ function clickWorld(mx, my, dbl) {
   if (hit?.kind === 'node') { clearSelection(); api.gatherNode(hit.n); return; }
   const [wx, wy] = screenToWorld(mx, my), tx = Math.floor(wx), ty = Math.floor(wy);
   if (!inB(tx, ty)) return;
+  if (!explored(tx, ty)) { clearSelection(); if (pl.goTo(tx, ty)) sfx('ui'); else toast('Туда не пройти — густой туман, разведай окрестности', 'warn'); return; }
   if (tileAt(tx, ty) === T.WATER) { selectWater(tx, ty); return; }
   clearSelection();
   if (!pl.goTo(tx, ty)) { /* недоступно — попробуем ближайшую клетку */ toast('Туда не пройти', 'warn'); }

@@ -135,13 +135,15 @@ export function generate(seed) {
     }
     G.tiles[y * N + x] = t;
   }
-  // озеро недалеко от лагеря
-  const ang = rng() * Math.PI * 2, lx = c + Math.cos(ang) * 13, ly = c + Math.sin(ang) * 13;
-  const lrx = 4 + rng() * 1.5, lry = 3 + rng(), rot = rng() * 3;
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const ox = x - lx, oy = y - ly, u = (ox * Math.cos(rot) + oy * Math.sin(rot)) / lrx, v = (-ox * Math.sin(rot) + oy * Math.cos(rot)) / lry;
-    const k = u * u + v * v + (hash2(x, y, seed) - 0.5) * 0.35;
-    if (k < 1) { G.tiles[y * N + x] = T.WATER; forest[y * N + x] = 0; }
+  // озеро недалеко от лагеря и второе — подальше, в глубине острова
+  const ang = rng() * Math.PI * 2;
+  for (const [dist, a, rx, ry] of [[13, ang, 4 + rng() * 1.5, 3 + rng()], [28, ang + 2.2 + rng() * 1.4, 6 + rng() * 2, 4 + rng() * 1.5]]) {
+    const lx = c + Math.cos(a) * dist, ly = c + Math.sin(a) * dist, rot = rng() * 3;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const ox = x - lx, oy = y - ly, u = (ox * Math.cos(rot) + oy * Math.sin(rot)) / rx, v = (-ox * Math.sin(rot) + oy * Math.cos(rot)) / ry;
+      const k = u * u + v * v + (hash2(x, y, seed) - 0.5) * 0.35;
+      if (k < 1) { G.tiles[y * N + x] = T.WATER; forest[y * N + x] = 0; }
+    }
   }
   // лагерь: чистая поляна
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
@@ -178,7 +180,8 @@ function scatterNodes(rng, c) {
   const tiles = [];
   for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) tiles.push([x, y]);
   for (let i = tiles.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [tiles[i], tiles[j]] = [tiles[j], tiles[i]]; }
-  let scrapLeft = 9, appleLeft = 6;
+  const AREA = N * N / 3136;   // во сколько раз остров больше прежнего 56×56
+  let scrapLeft = Math.round(9 * AREA), appleLeft = Math.round(6 * AREA);
   for (const [x, y] of tiles) {
     const t = G.tiles[y * N + x]; if (t === T.WATER) continue;
     const r = Math.hypot(x + 0.5 - c, y + 0.5 - c), q = rng();

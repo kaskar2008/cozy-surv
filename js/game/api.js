@@ -14,6 +14,9 @@ import { rnd, rndi, pick, chance, clamp } from '../core/util.js';
 import { sfx } from '../core/audio.js';
 import { buildTime } from './progress.js';
 import { PET_FOOD, HUNGRY, petWord } from '../data/pets.js';
+import { explored } from './fog.js';
+import { addXp, bonus, recipeLock, lockText, findConstellation, COOKING } from './skills.js';
+import { CONSTS } from '../data/skills.js';
 
 export const S = { fx, eco, G, toast: () => {}, hooks: {} };
 export const toast = (msg, kind) => S.toastFn && S.toastFn(msg, kind);
@@ -64,6 +67,7 @@ export function canPlace(def, x, y, rot) {
   for (let j = 0; j < d; j++) for (let i = 0; i < w; i++) {
     const tx = x + i, ty = y + j, k = ty * N + tx;
     if (!inB(tx, ty)) { bad.add(k); reason = 'За пределами острова'; continue; }
+    if (!explored(tx, ty)) { bad.add(k); reason = 'Это место скрыто туманом — сначала подойди ближе'; continue; }
     const tt = G.tiles[k];
     if (tt === T.WATER) water++; else land++;
     if (G.bAt[k]) { bad.add(k); reason = reason || 'Место занято'; continue; }
@@ -127,14 +131,24 @@ export function place(def, x, y, rot) {
     const nd = addNode(def.plantNode.t, x, y, { st: 'sapling', tm: def.plantNode.tm, v: def.plantNode.t === 'tree' ? Math.floor(Math.random() * 3) + 3 * rndi(0, 7) : rndi(0, 500) });
     fx.dust(x + .5, y + .5, 6); sfx('place'); return nd;
   }
-  addBld(b); b.bld = { p: 0, T: buildTime(def) };      // стройка: постройка заработает, когда прогресс дойдёт до 100%
+  addBld(b); b.bld = { p: 0, T: buildTime(def) * (1 - bonus('carp', 'build')) };      // стройка: постройка заработает, когда прогресс дойдёт до 100%
   fx.dust(x + b.w / 2, y + b.d / 2, 8 + b.w * 2); sfx('place');
   ensureLinks(); nudgeWorldPlayer();
   return b;
 }
+// плотничество: опыт за стройку и шанс сэкономить материалы
+function carpentryReward(def, b) {
+  const cost = Object.values(def.cost).reduce((a, v) => a + v, 0);
+  addXp('carp', def.drag ? .25 : Math.min(8, 1 + cost / 10));
+  const save = bonus('carp', 'save'), back = {};
+  if (save) for (const k in def.cost) for (let i = 0; i < def.cost[k]; i++) if (chance(save)) back[k] = (back[k] || 0) + 1;
+  const got = Object.entries(back).filter(([k, v]) => eco.add(k, v) > 0);
+  if (got.length) fx.floatText(b.x + b.w / 2, b.y + b.d / 2, 'Сэкономил ' + got.map(([k, v]) => `${v}${itemIcon(k)}`).join(' '), '#d8f0b0', 44);
+}
 export function finishBuild(b) {
   const def = BDEF[b.t]; delete b.bld;
   G.built[def.id] = (G.built[def.id] || 0) + 1; stat('built');
+  carpentryReward(def, b);
   G.dirtyLinks = true; ensureLinks();   // без «появления с нуля»: постройка уже полностью видна после стройки
   fx.dust(b.x + b.w / 2, b.y + b.d / 2, 14 + b.w * 2); fx.sparkle(b.x + b.w / 2, b.y + b.d / 2, 40, '#fff6b0', 6); sfx('place');
   if (HINTS[def.id] && !G.flags['h_' + def.id]) { G.flags['h_' + def.id] = 1; toast(HINTS[def.id]); }
@@ -208,10 +222,16 @@ function toCompost(n) {
   if (best) { best.st.load = (best.st.load || 0) + 1; fx.floatText(best.x + .5, best.y + .5, '+♻️', '#cfe8a0', 30); fx.floatText(n.x + .5, n.y + .5, 'В компост', '#cfe8a0', 22); stat('poopCompost'); }
   else fx.floatText(n.x + .5, n.y + .5, 'Убрано', '#e8e0d0', 22);
 }
+const BEACH = new Set(['shell', 'sandpile', 'driftwood']);
 function finishGather(n, g) {
   let got = rollGive(g.give);
   if (g.bonus) for (const k in g.bonus) if (chance(g.bonus[k][0])) got[k] = (got[k] || 0) + rndi(g.bonus[k][1], g.bonus[k][2]);
   if (G.needs.mood > 70 && chance(.07)) { for (const k in got) got[k]++; fx.sparkle(n.x + .5, n.y + .5, 20); }
+  if (n.t !== 'poop') {
+    if (chance(bonus('forage', 'extra'))) { for (const k in got) got[k]++; fx.sparkle(n.x + .5, n.y + .5, 14, '#d8f0b0'); }
+    if (BEACH.has(n.t) && chance(bonus('forage', 'find'))) { const f = pick(['shell', 'shell', 'scrap', 'glass']); got[f] = (got[f] || 0) + 1; toast(`Нашёл на берегу: ${itemIcon(f)} ${itemName(f)}`); }
+    addXp('forage', g.tool ? 1 : 2);
+  }
   let full = false, txt = [];
   for (const k in got) { const a = eco.add(k, got[k]); if (a < got[k]) full = true; if (a > 0) txt.push(`+${a}${itemIcon(k)}`); }
   if (txt.length) fx.floatText(n.x + .5, n.y + .5, txt.join(' '), '#fff6d0');
@@ -232,7 +252,7 @@ export function gatherNode(n) {
   const full = Object.keys(g.give).length > 0 && Object.keys(g.give).every((k) => eco.space(k) <= 0);
   if (full) { toast('Склад полон: нет места для ' + Object.keys(g.give).map(itemName).join(', '), 'warn'); return; }
   const ok = pl.goToRect(n.x, n.y, 1, 1, () => {
-    pl.startWork(g.verb, g.time, g.fx, () => finishGather(n, g), { faceTo: [n.x + .5, n.y + .5], tick: () => { if (Math.random() < .08) n.shk = performance.now() / 1000; } });
+    pl.startWork(g.verb, g.time * (1 - bonus('forage', 'fast')), g.fx, () => finishGather(n, g), { faceTo: [n.x + .5, n.y + .5], tick: () => { if (Math.random() < .08) n.shk = performance.now() / 1000; } });
   });
   if (!ok) toast('Туда не добраться', 'warn');
 }
@@ -246,10 +266,10 @@ export function fishFrom(wx, wy) {
   if (!best) { toast('Подойти к воде не получается', 'warn'); return; }
   pl.goTo(best[0], best[1], () => {
     const dock = bldAt(best[0], best[1]); const fast = dock && BDEF[dock.t].fishSpot;
-    pl.startWork('Рыбалка…', rnd(6, 11) * (fast ? .6 : 1), 'fish', () => {
-      const q = Math.random() + (fast ? -.08 : 0);
-      stat('casts');
-      if (q < .66) { const a = eco.add('fish', 1); fx.floatText(wx + .5, wy + .5, a ? '+1🐟' : 'Склад полон', '#cfeaff'); if (a) { stat('fish'); if (chance(.02 + (fast ? .01 : 0))) { eco.add('honey', 1); stat('golden'); toast('Золотая рыбка! Она подмигнула и уплыла, оставив капельку мёда 🍯'); } } }
+    pl.startWork('Рыбалка…', rnd(6, 11) * (fast ? .6 : 1) * (1 - bonus('fish', 'bite')), 'fish', () => {
+      const q = Math.random() + (fast ? -.08 : 0) - bonus('fish', 'luck');
+      stat('casts'); addXp('fish', 1);
+      if (q < .66) { const a = eco.add('fish', chance(bonus('fish', 'dbl')) ? 2 : 1); fx.floatText(wx + .5, wy + .5, a ? `+${a}🐟` : 'Склад полон', '#cfeaff'); if (a) { stat('fish'); addXp('fish', 2); if (chance(.02 + (fast ? .01 : 0))) { eco.add('honey', 1); stat('golden'); toast('Золотая рыбка! Она подмигнула и уплыла, оставив капельку мёда 🍯'); } } }
       else if (q < .74) { eco.add('shell', 1); fx.floatText(wx + .5, wy + .5, '+1🐚', '#fff'); }
       else if (q < .8) { eco.add('scrap', 1); fx.floatText(wx + .5, wy + .5, 'Старая банка +1⚙️', '#fff'); }
       else if (q < .84) { eco.add('clay', 1); fx.floatText(wx + .5, wy + .5, '+1🟫', '#fff'); }
@@ -335,8 +355,8 @@ export function collectOut(b) {
 }
 export function feedAnimals(b, what) {
   const def = BDEF[b.t];
-  if (what === 'feed') { const it = def.animals.feed.find((i) => eco.has(i)); if (!it) { toast('Нужен корм: ' + def.animals.feed.map(itemName).join(' / '), 'warn'); return; } doAt(b, 'Кормлю', 1.2, 'pick', () => { if (eco.take(it, 1)) { b.st.feedT = Math.max(b.st.feedT, 0) + 300; fx.hearts(b.x + b.w / 2, b.y + b.d / 2, 30); } }); }
-  else { if (!eco.has('water')) { toast('Нужна вода (ведро)', 'warn'); return; } doAt(b, 'Наливаю воду', 1.2, 'pick', () => { if (eco.take('water', 1)) { b.st.waterT = Math.max(b.st.waterT, 0) + 300; sfx('splash'); } }); }
+  if (what === 'feed') { const it = def.animals.feed.find((i) => eco.has(i)); if (!it) { toast('Нужен корм: ' + def.animals.feed.map(itemName).join(' / '), 'warn'); return; } doAt(b, 'Кормлю', 1.2, 'pick', () => { if (eco.take(it, 1)) { b.st.feedT = Math.max(b.st.feedT, 0) + 300; addXp('animals', 2); fx.hearts(b.x + b.w / 2, b.y + b.d / 2, 30); } }); }
+  else { if (!eco.has('water')) { toast('Нужна вода (ведро)', 'warn'); return; } doAt(b, 'Наливаю воду', 1.2, 'pick', () => { if (eco.take('water', 1)) { b.st.waterT = Math.max(b.st.waterT, 0) + 300; addXp('animals', 1); sfx('splash'); } }); }
 }
 // компост
 export function loadCompost(b) {
@@ -365,20 +385,20 @@ export function plantCrop(b, plotIdx, crop) {
   doAt(b, 'Сажаю', 2, 'pick', () => {
     if (!eco.take(c.seed, 1)) return;
     p.crop = crop; p.prog = 0; p.moist = Math.max(p.moist, .5); p.fert = 0;
-    stat('planted'); sfx('pick');
+    stat('planted'); addXp('garden', 2); sfx('pick');
   });
 }
 export function waterPlot(b, plotIdx) {
   const p = b.st.plots[plotIdx];
   if (!eco.has('water')) { toast('Нужна вода: набери ведро в пруду или у бака', 'warn'); return; }
-  doAt(b, 'Поливаю', 1.6, 'pick', () => { if (eco.take('water', 1)) { p.moist = 1; fx.drop(b.x + 1, b.y + 1, 20); fx.floatText(b.x + 1, b.y + 1, '💧', '#cfeaff', 30); stat('watered'); sfx('splash'); } });
+  doAt(b, 'Поливаю', 1.6, 'pick', () => { if (eco.take('water', 1)) { p.moist = 1; fx.drop(b.x + 1, b.y + 1, 20); fx.floatText(b.x + 1, b.y + 1, '💧', '#cfeaff', 30); stat('watered'); addXp('garden', 1); sfx('splash'); } });
 }
 export function fertilizePlot(b, plotIdx) {
   const p = b.st.plots[plotIdx];
   if (!p.crop) return;
   if (p.fert) { toast('Уже удобрено'); return; }
   if (!eco.has('compost')) { toast('Нужен компост — поставь компостную кучу', 'warn'); return; }
-  doAt(b, 'Удобряю', 1.4, 'pick', () => { if (eco.take('compost', 1)) { p.fert = 1; fx.sparkle(b.x + 1, b.y + 1, 14, '#cfe8a0'); } });
+  doAt(b, 'Удобряю', 1.4, 'pick', () => { if (eco.take('compost', 1)) { p.fert = 1; addXp('garden', 1); fx.sparkle(b.x + 1, b.y + 1, 14, '#cfe8a0'); } });
 }
 export function harvestPlot(b, plotIdx) {
   const p = b.st.plots[plotIdx];
@@ -389,8 +409,10 @@ export function harvestPlot(b, plotIdx) {
     if (G.needs.mood > 70 && chance(.15)) n++;
     // пчёлы рядом = опыление
     for (const o of G.bMap.values()) if (BDEF[o.t].tags.includes('hive') && Math.hypot(o.x - b.x, o.y - b.y) <= 7) { n += 1; break; }
+    const twice = chance(bonus('garden', 'dbl')); if (twice) n *= 2;
     const a = eco.add(c.out, n), seeds = eco.add(c.seed, rndi(1, 2));
-    fx.floatText(b.x + 1, b.y + 1, `+${a}${itemIcon(c.out)}${seeds ? ` +${seeds}🌰` : ''}`, '#fff6d0', 40);
+    addXp('garden', 4);
+    fx.floatText(b.x + 1, b.y + 1, `${twice ? '✨ ' : ''}+${a}${itemIcon(c.out)}${seeds ? ` +${seeds}🌰` : ''}`, '#fff6d0', 40);
     fx.sparkle(b.x + 1, b.y + 1, 14);
     if (a < n) toast('Склад полон — часть урожая осталась', 'warn');
     stat('harvested'); if (season() === 3) stat('winterHarvest'); (G.stats.crops ||= {})[p.crop] = (G.stats.crops[p.crop] || 0) + 1;
@@ -402,6 +424,7 @@ export function clearPlot(b, plotIdx) { const p = b.st.plots[plotIdx]; p.crop = 
 // ---------------------------------------------------------------- крафт
 export function canCraft(b, station, r) {
   const st = STATIONS[station];
+  if (recipeLock(r)) return false;
   for (const k in r.in) {
     if (k === 'water' && st.water) { if (waterAvailable(b) < r.in[k] && !eco.has('water', r.in[k])) return false; }
     else if (!eco.has(k, r.in[k])) return false;
@@ -422,10 +445,11 @@ export function startCraft(b, station, idx, qty = 1) {
   const st = STATIONS[station], r = st.recipes[idx];
   if (b.st.cur) { toast('Станция занята'); return; }
   if (r.once && Object.keys(r.out).every((k) => eco.has(k))) { toast('У тебя уже есть такой инструмент'); return; }
+  if (recipeLock(r)) { toast('Рецепт откроется с навыком: ' + lockText(r), 'warn'); return; }
   if (!stationHeatOk(b, station)) { toast(st.heat === 'self' ? 'Сначала разведи огонь' : 'Нужен горящий огонь вплотную к станции', 'warn'); return; }
   if (!canCraft(b, station, r)) { toast('Не хватает ингредиентов', 'warn'); return; }
   consumeFor(b, station, r);
-  const heatBoost = st.heatBoost && heated(b) ? 2 : 1;
+  const heatBoost = (st.heatBoost && heated(b) ? 2 : 1) / (COOKING.has(station) ? 1 - bonus('cook', 'speed') : 1);
   b.st.cur = { st: station, idx, left: r.t / heatBoost, total: r.t / heatBoost };
   b.st.q = Math.max(0, qty - 1); sfx('craft');
 }
@@ -434,7 +458,7 @@ export function handCraft(idx) {
   if (r.once && Object.keys(r.out).every((k) => eco.has(k))) { toast('У тебя уже есть такой инструмент'); return; }
   if (!eco.canAfford(r.in)) { toast('Не хватает материалов', 'warn'); return; }
   eco.pay(r.in);
-  pl.startWork('Мастерю…', r.t, 'pick', () => { for (const k in r.out) eco.add(k, r.out[k]); fx.floatText(G.player.x, G.player.y, Object.entries(r.out).map(([k, v]) => `+${v}${itemIcon(k)}`).join(' '), '#fff6d0'); stat('crafted'); sfx('craft'); });
+  pl.startWork('Мастерю…', r.t, 'pick', () => { for (const k in r.out) eco.add(k, r.out[k]); fx.floatText(G.player.x, G.player.y, Object.entries(r.out).map(([k, v]) => `+${v}${itemIcon(k)}`).join(' '), '#fff6d0'); stat('crafted'); addXp('carp', 1); sfx('craft'); });
 }
 
 // ---------------------------------------------------------------- еда
@@ -446,7 +470,7 @@ export function eat(item) {
   if (!useful) { toast('Пока не хочется'); return; }
   pl.startWork('Ем', 1.8, 'eat', () => {
     if (!eco.take(item, 1)) return;
-    if (e.h) n.hunger = clamp(n.hunger + e.h, 0, 100);
+    if (e.h) n.hunger = clamp(n.hunger + e.h * (1 + (it.c === 'meal' ? bonus('cook', 'fill') : 0)), 0, 100);
     if (e.t) n.thirst = clamp(n.thirst + e.t, 0, 100);
     if (e.w) addBuff('warm', e.w, 120);
     if (e.m) addBuff('mood', e.m, 90);
@@ -504,8 +528,11 @@ export function napAt(b) {
 export function stargaze(b) {
   const night = isNight();
   doAt(b, night ? 'Смотрю на звёзды' : 'Смотрю вдаль', night ? 12 : 6, 'read', () => {
-    addBuff('mood', night ? 22 : 5, night ? 300 : 90); stat('stars', night ? 1 : 0);
-    if (night) toast('Небо полное звёзд ✨ Настроение отличное'); fx.sparkle(G.player.x, G.player.y, 40, '#fff6b0', 10); sfx('chime');
+    const calm = 1 + bonus('astro', 'calm');
+    addBuff('mood', Math.round((night ? 22 : 5) * calm), night ? 300 : 90); stat('stars', night ? 1 : 0); addXp('astro', night ? 6 : 1);
+    const c = night && G.weather.type === 'clear' ? findConstellation() : null;
+    if (c) toast(`Телескоп нашёл созвездие «${c}» ✨ (${G.flags.consts.length}/${CONSTS.length})`);
+    else if (night) toast('Небо полное звёзд ✨ Настроение отличное'); fx.sparkle(G.player.x, G.player.y, 40, '#fff6b0', 10); sfx('chime');
   });
 }
 export function toggleMusic(b) { b.st.on = !b.st.on; if (b.st.on) stat('music'); }
@@ -540,7 +567,7 @@ export function feedPet(pet, item) {
     if (!eco.take(item, 1)) return;
     pet.hunger = Math.min(100, (pet.hunger ?? 70) + val); pet.bond = Math.min(100, (pet.bond ?? 40) + 3); pet.job = null; pet.starve = 0; pet.ask = 0;
     if (pet.kind === 'dog') pet.poopT = Math.min(pet.poopT ?? 100, rnd(40, 90));   // поел — скоро на прогулку «по делам»
-    fx.hearts(pet.x, pet.y, 16); fx.floatText(pet.x, pet.y, `+${itemIcon(item)}`, '#fff6d0', 30); sfx(pet.kind === 'cat' ? 'meow' : 'woof'); stat('petFed');
+    addXp('animals', 2); fx.hearts(pet.x, pet.y, 16); fx.floatText(pet.x, pet.y, `+${itemIcon(item)}`, '#fff6d0', 30); sfx(pet.kind === 'cat' ? 'meow' : 'woof'); stat('petFed');
   }, { faceTo: [pet.x, pet.y] }));
 }
 export function petPet(pet) {
@@ -553,7 +580,7 @@ export function petPet(pet) {
   const go = () => {
     pet.sleep = false; fx.hearts(pet.x, pet.y, 22);
     const bond = pet.bond ?? 40; addBuff('mood', Math.round(6 + bond * .06), 180);
-    stat('pets'); pet.love = (pet.love || 0) + 1; pet.bond = Math.min(100, bond + (pet.ask > 0 ? 4 : 2)); pet.ask = 0;
+    stat('pets'); addXp('animals', 1); pet.love = (pet.love || 0) + 1; pet.bond = Math.min(100, bond + (pet.ask > 0 ? 4 : 2) + Math.floor(bonus('animals', 'pet'))); pet.ask = 0;
     sfx(pet.kind === 'cat' ? 'meow' : 'woof'); toast(pet.kind === 'cat' ? 'Мурр… ♥' : 'Гав! ♥');
   };
   near(pet, () => pl.startWork('Глажу', 2.2, 'pick', go, { faceTo: [pet.x, pet.y] }));

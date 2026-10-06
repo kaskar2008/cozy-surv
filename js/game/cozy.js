@@ -4,6 +4,7 @@ import { BDEF } from '../data/buildings/index.js';
 import { FDEF } from '../data/furniture.js';
 import { isHot } from './nets.js';
 import { flowersNear } from './api.js';
+import { bonus } from './skills.js';
 
 const dist = (a, b) => Math.hypot(a.x + a.w / 2 - b.x - b.w / 2, a.y + a.d / 2 - b.y - b.d / 2);
 export const COZY_LEVELS = [[0, 'Скромно'], [15, 'Обжито'], [40, 'Уютно'], [80, 'Очень уютно'], [140, 'Тёплый дом мечты'], [220, 'Райский уголок']];
@@ -58,5 +59,7 @@ export function computeCozy() {
     for (const s of IN_SYN) { let ok = false; try { ok = s.test(items, home); } catch (e) { } if (ok) { sub += s.pts; if (!list.some((l) => l.id === s.id)) list.push({ id: s.id, name: s.name, pts: s.pts }); } }
     inn += sub;
   }
-  G.cozy = { total: Math.round(out * .8 + inn), out: Math.round(out * .8), inn: Math.round(inn), list };
+  const soul = bonus('art', 'cozy');   // навык «Творчество»
+  if (soul) list.push({ id: 'creative_soul', name: 'Творческая душа', pts: soul });
+  G.cozy = { total: Math.round(out * .8 + inn) + soul, out: Math.round(out * .8), inn: Math.round(inn), list };
 }

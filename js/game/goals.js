@@ -5,6 +5,9 @@ import { S, toast } from './api.js';
 import { itemIcon } from '../data/items.js';
 import * as eco from './eco.js';
 import { sfx } from '../core/audio.js';
+import { SKILL_IDS } from '../data/skills.js';
+import { levelOf } from './skills.js';
+import { exploredPct } from './fog.js';
 
 const st = (k) => G.stats[k] || 0;
 const built = (id) => (G.built[id] || 0) > 0;
@@ -48,6 +51,12 @@ export const GOALS = [
   { id: 'house', ic: '🏡', name: 'Настоящий дом', desc: 'Улучши хижину до дома.', ok: () => anyB((b, d) => d.home && b.lvl >= 3), reward: { glass: 4 } },
   { id: 'cozy40', ic: '☕', name: 'Уютно', desc: 'Доведи «уют» до 40.', ok: () => G.cozy.total >= 40, reward: { wax: 3 } },
   { id: 'cozy100', ic: '🧸', name: 'Очень уютно', desc: 'Доведи «уют» до 100.', ok: () => G.cozy.total >= 100, reward: { glass: 4 } },
+  { id: 'explore30', ic: '🧭', name: 'За околицей', desc: 'Разведай 30% острова: туман отступает там, где ты ходишь.', ok: () => exploredPct() >= .3, reward: { rope: 3 } },
+  { id: 'explore60', ic: '🗺️', name: 'Знаток острова', desc: 'Разведай 60% острова.', ok: () => exploredPct() >= .6, reward: { glass: 3 } },
+  { id: 'explore95', ic: '🏝️', name: 'Весь остров как на ладони', desc: 'Разведай почти весь остров (95%).', ok: () => exploredPct() >= .95, reward: { honey: 4 } },
+  { id: 'skill3', ic: '🌟', name: 'Набираюсь опыта', desc: 'Подними любой навык до 3 уровня (кнопка 🌟).', ok: () => SKILL_IDS.some((id) => levelOf(id) >= 3), reward: { wax: 2 } },
+  { id: 'skill5', ic: '🏅', name: 'Знаток своего дела', desc: 'Подними любой навык до 5 уровня.', ok: () => SKILL_IDS.some((id) => levelOf(id) >= 5), reward: { glass: 3 } },
+  { id: 'skillall', ic: '🎓', name: 'На все руки', desc: 'Подними все навыки хотя бы до 2 уровня.', ok: () => SKILL_IDS.every((id) => levelOf(id) >= 2), reward: { honey: 4 } },
   { id: 'cozy200', ic: '🌈', name: 'Райский уголок', desc: 'Доведи «уют» до 200. Дальше можно просто жить.', ok: () => G.cozy.total >= 200, reward: { honey: 5 } },
 ];
 export function checkGoals() {

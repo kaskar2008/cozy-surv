@@ -19,17 +19,20 @@ import { workProgress } from '../game/progress.js';
 import { buildConstruction, constructPose } from './construct.js';
 import { mark, now as pnow } from '../core/prof.js';
 import { setOutline, renderOutline } from './outline.js';
+import { initFogLayer, updateFogLayer } from './fogLayer.js';
+import { explored } from '../game/fog.js';
 
 // Состояние отрисовки, которое задают ввод и UI
 export const R = { hover: null, ghost: null, sel: null, links: [], grid: false, time: 0 };
 
 export const roots = { world: null, room: null };
-let inst = null, dyn = null;
+let inst = null, dyn = null, fogShown = false;
 export function initScene(glCanvas) {
   initGL(glCanvas);
   roots.world = new THREE.Group(); roots.room = new THREE.Group(); roots.room.visible = false;
   scene.add(roots.world, roots.room);
   inst = new Instancer(roots.world); dyn = new DynBatch(roots.world);
+  initFogLayer(roots.world);
 }
 const nowS = () => performance.now() / 1000;
 
@@ -109,7 +112,7 @@ export function renderWorld(ctx, t, dt) {
   updateCam(); setBg(WATER_BG);
   syncCamera(); setSun(hour(), dk, o.raining);
   let p0 = pnow();
-  updateTerrain(roots.world, season_); p0 = mark('r.terrain', p0);
+  updateTerrain(roots.world, season_); updateFogLayer(t, dt, !fogShown); fogShown = true; p0 = mark('r.terrain', p0);
 
   inst.begin(); dyn.b.reset();
   const outl = []; const hv = R.ghost ? null : R.hover, sv = R.sel;
@@ -117,6 +120,7 @@ export function renderWorld(ctx, t, dt) {
   const lights = [], c = dyn.b;
   for (const b of G.bMap.values()) {
     const def = BDEF[b.t];
+    if (!explored(b.x, b.y)) continue;
     if (def.draw && !def.terraform) {
       let sy = 1, sxz = 1, lift = 0, hide = false;
       if (b.bld) { const ps = constructPose(b, def); sy = ps.sy ?? 1; sxz = ps.sxz ?? 1; lift = ps.lift || 0; hide = !!ps.hide; }
@@ -137,6 +141,7 @@ export function renderWorld(ctx, t, dt) {
     else if (def.home && !b.bld && b.st.glow && o.dusk) lights.push({ x: b.x + b.w / 2, y: b.y + b.d / 2, z: 20, r: 2.2 + b.w * .5, col: '#ffcf80', a: .8 });
   }
   for (const n of G.nodeMap.values()) {
+    if (!explored(n.x, n.y)) continue;
     const def = NDEF[n.t];
     let dx = 0;
     if (n.shk && nowS() - n.shk < .45) dx = Math.sin(nowS() * 60) * .05 * (1 - (nowS() - n.shk) / .45);
@@ -146,8 +151,8 @@ export function renderWorld(ctx, t, dt) {
   }
   const pl = G.player || G.player;
   if (G.scene === 'world') buildPlayer(c, pl, t, entityPose(pl, o, true, t));
-  for (const p of G.pets) if (!p.in) buildPet(c, p, t, entityPose(p, o, false, t));
-  if (G.npc) buildTraveler(c, G.npc, t, entityPose(G.npc, o, false, t));
+  for (const p of G.pets) if (!p.in && explored(Math.floor(p.x), Math.floor(p.y))) buildPet(c, p, t, entityPose(p, o, false, t));
+  if (G.npc && explored(Math.floor(G.npc.x), Math.floor(G.npc.y))) buildTraveler(c, G.npc, t, entityPose(G.npc, o, false, t));
   c.setRot(0); c.ox = c.oy = c.oz = 0;
   p0 = mark('r.collect', p0);
 
@@ -260,9 +265,9 @@ function drawOverlays(c, o, t) {
   }
   if (G.scene === 'world') drawWorkRing(c, G.player);
   // пузырьки и значки существ
-  for (const p of G.pets) if (!p.in) { drawPetBubble(c, p, t); if (p.sleep) drawZ(c, p, t, 14); }
+  for (const p of G.pets) if (!p.in && explored(Math.floor(p.x), Math.floor(p.y))) { drawPetBubble(c, p, t); if (p.sleep) drawZ(c, p, t, 14); }
   if (G.player.fx === 'sleep' || G.player.fx === 'nap') drawZ(c, G.player, t);
-  if (G.npc?.gift) drawGift(c, G.npc, t);
+  if (G.npc?.gift && explored(Math.floor(G.npc.x), Math.floor(G.npc.y))) drawGift(c, G.npc, t);
   // значки состояния и мини-прогресс процессов над постройками
   c.textAlign = 'center'; c.font = `${14 * zk}px sans-serif`;
   const v = viewTiles(2);

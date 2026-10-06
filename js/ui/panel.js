@@ -13,6 +13,7 @@ import * as api from '../game/api.js';
 import { S, bldName, defOf, linksOf, refundOf, canCraft, stationHeatOk, waterAvailable } from '../game/api.js';
 import { netOf, isHot, heated } from '../game/nets.js';
 import { workProgress } from '../game/progress.js';
+import { recipeLock, lockText } from '../game/skills.js';
 import { enterHome, furnActions, removeFurn, proxyOf, homeOf } from '../game/interior.js';
 import { R } from '../render/scene.js';
 import { focusUpper } from '../render/camera.js';
@@ -47,7 +48,7 @@ function recipesUI(holder, stationKey, def) {
     const can = canCraft(holder, stationKey, r) && !(r.once && Object.keys(r.out).every((k) => eco.has(k)));
     const busy = !!cur && cur.st === stationKey && cur.idx === idx;
     const row = h('div', { class: 'recipe' + (can || busy ? '' : ' off') + (busy ? ' cooking' : ''), style: busy ? `--p:${(100 * (1 - cur.left / cur.total)).toFixed(1)}%` : null },
-      h('div', { class: 'r-out' }, h('span', { class: 'big' }, itemIcon(Object.keys(r.out)[0])), h('div', null, h('b', null, name + (Object.values(r.out)[0] > 1 ? ` ×${Object.values(r.out)[0]}` : '')), h('small', null, `⏱ ${r.t} с`), busy && holder.st.q > 0 ? h('small', { class: 'qleft' }, `Осталось: ${holder.st.q + 1}`) : null)),
+      h('div', { class: 'r-out' }, h('span', { class: 'big' }, itemIcon(Object.keys(r.out)[0])), h('div', null, h('b', null, name + (Object.values(r.out)[0] > 1 ? ` ×${Object.values(r.out)[0]}` : '')), h('small', null, `⏱ ${r.t} с`), recipeLock(r) ? h('small', { class: 'lock' }, '🔒 ' + lockText(r)) : null, busy && holder.st.q > 0 ? h('small', { class: 'qleft' }, `Осталось: ${holder.st.q + 1}`) : null)),
       h('div', { class: 'r-in' }, ...Object.entries(r.in).map(([k, n]) => h('span', { class: 'chip ' + (have(k, n) ? '' : 'miss') }, `${n}${itemIcon(k)}`))),
       h('div', { class: 'r-btn' }, h('button', { disabled: !!cur || !can, onclick: () => { api.startCraft(holder, stationKey, idx, 1); renderPanel(true); } }, 'Сделать'), r.once ? null : h('button', { class: 'sm', disabled: !!cur || !can, title: 'Поставить в очередь ×3', onclick: () => { api.startCraft(holder, stationKey, idx, 3); renderPanel(true); } }, '×3')));
     wrap.append(row);
