@@ -112,6 +112,7 @@ function describeBld(b) {
     lines.push(b.nb.some((n) => BDEF[n.t].tags.includes('feeder_animal')) ? '✅ Кормушка рядом' : '💡 Кормушка вплотную кормит сама');
     lines.push(b.nb.some((n) => BDEF[n.t].tags.includes('trough')) ? '✅ Поилка рядом' : '💡 Поилка (подключённая к воде) вплотную поит сама');
   }
+  if (def.tags.includes('scarecrow')) { const n = api.cropsInScare(b).length; lines.push(n ? `🥕 Грядок под защитой: ${n} (рост +10%)` : 'Поставь грядки в 4 клетках от пугала — они вырастут на 10% быстрее.'); }
   if (def.compost) {
     lines.push(`🟤 Загружено: ${st.load} · готово: ${st.ready}/6`);
     A('♻️ Заложить (2 волокна/травы)', () => api.loadCompost(b)); if (st.ready > 0) A(`🟤 Забрать компост (${st.ready})`, () => api.takeCompost(b));
@@ -136,6 +137,7 @@ function describeBld(b) {
       }
     });
     if (G.comp.water.has(b.id)) lines.push('💧 Подключено к трубам: поливается само');
+    lines.push(api.scarecrowsNear(b).length ? '🧑‍🌾 Пугало рядом: растёт на 10% быстрее' : '💡 Пугало в 4 клетках ускоряет рост на 10%');
     { const cs = api.compostsNear(b); lines.push(cs.length ? `🟤 Компост рядом (${cs.length}): сам удобрит посевы, когда созреет` : '💡 Компостная куча в 3 клетках сама удобряет посевы'); }
   }
   if (def.sit) A(`${def.sit.label || '🪑 Посидеть'} (+${def.sit.mood}😊)`, () => api.sitAt(b));

@@ -1,4 +1,5 @@
 // Верхняя панель: время, потребности, ресурсы, быстрые кнопки.
+import { rotateCam } from '../render/camera.js';
 import { h, $ } from '../core/util.js';
 import { G, day, season, fmtClock, hour, darkness } from '../game/state.js';
 import { SEASONS, SEASON_ICON } from '../data/crops.js';
@@ -39,6 +40,8 @@ export function buildHUD() {
   $('#rightcol').prepend(
     h('div', { id: 'menu-btns' },
       h('button', { title: 'К персонажу (Пробел)', onclick: centerPlayer }, '🎯'),
+      h('button', { class: 'rot', title: 'Повернуть камеру влево (Q)', onclick: () => rotateCam(-1) }, '⟲'),
+      h('button', { class: 'rot', title: 'Повернуть камеру вправо (E)', onclick: () => rotateCam(1) }, '⟳'),
       h('button', { title: 'Рюкзак (I)', onclick: openInventory }, '🎒'),
       h('button', { title: 'Крафт (C)', onclick: openCraft }, '🛠️'),
       h('button', { title: 'Журнал: цели, уют, рецепты (J)', onclick: () => openJournal('goals') }, '📖'),
@@ -57,6 +60,7 @@ const syncMute = () => { const b = $('#mute-btn'); if (b) b.textContent = isMute
 
 export function updateHUD(dt) {
   acc += dt; if (acc < .2) return; acc = 0;
+  for (const b of document.querySelectorAll('#menu-btns .rot')) b.style.display = G.scene === 'world' ? '' : 'none';
   els.season.textContent = `${SEASON_ICON[season()]} ${SEASONS[season()]}`; els.day.textContent = `День ${day() + 1}`; els.clock.textContent = fmtClock();
   els.wx.textContent = WX[G.weather.type]; els.wx.title = { clear: 'Ясно', cloudy: 'Облачно', rain: 'Дождь', fog: 'Туман', snow: 'Снег' }[G.weather.type];
   syncSpeed();

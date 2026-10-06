@@ -1,8 +1,9 @@
 // Ввод: мышь, клавиатура, камера, призрак постройки, фотографии.
 import { UI } from './ui/state.js';
 import { G, N, day } from './game/state.js';
-import { cam, screenToWorld, worldToScreen, zoomAt, centerOn } from './render/camera.js';
+import { cam, screenToWorld, worldToScreen, zoomAt, centerOn, panScreen, rotateCam } from './render/camera.js';
 import { R } from './render/scene.js';
+import { captureFrame } from './render/gl.js';
 import { BDEF } from './data/buildings/index.js';
 import { NDEF } from './data/nodes.js';
 import { FDEF } from './data/furniture.js';
@@ -53,7 +54,7 @@ function onWheel(e) {
   // тачпад шлёт мелкие дробные дельты и часто deltaX; колесо мыши — крупные «ступеньки» только по Y
   if (!e.ctrlKey && e.deltaMode === 0 && (e.deltaX !== 0 || Math.abs(e.deltaY) < 40 || (e.deltaY % 1 !== 0))) padUntil = now + 300;
   if (e.ctrlKey || now >= padUntil) { zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0012))); return; }
-  cam.goto = null; cam.x += e.deltaX / cam.zoom; cam.y += e.deltaY / cam.zoom; clampCam();
+  cam.goto = null; panScreen(e.deltaX, e.deltaY); clampCam();
 }
 const inside = () => G.scene !== 'world';
 const curDef = () => (inside() ? UI.fdef : UI.def);
@@ -79,11 +80,11 @@ function onDown(e) {
   const bd = UI.tool === 'build' ? curDef() : null;
   UI.mouse.x = e.clientX; UI.mouse.y = e.clientY - liftFor(bd); UI.mouse.in = true;
   if (G.player.sleeping) { api.wakeUp(); return; }
-  if (e.button === 1 || e.button === 2) { drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false, btn: e.button }; return; }
+  if (e.button === 1 || e.button === 2) { drag = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, moved: false, btn: e.button }; return; }
   if (e.button !== 0) return;
   if (UI.modal) return;
   if (UI.touch && !bd) {
-    drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false, btn: 0, touch: true };
+    drag = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, moved: false, btn: 0, touch: true };
     return;
   }
   if (bd) {
@@ -116,7 +117,7 @@ function onMove(e) {
     if (gesture && pointers.size >= 2) {
       const m = mid();
       zoomAt(m.x, m.y, m.d / gesture.d);
-      cam.x -= (m.x - gesture.x) / cam.zoom; cam.y -= (m.y - gesture.y) / cam.zoom; clampCam();
+      panScreen(-(m.x - gesture.x), -(m.y - gesture.y)); clampCam();
       gesture = { d: m.d, x: m.x, y: m.y };
       return;
     }
@@ -129,7 +130,8 @@ function onMove(e) {
   if (drag) {
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (Math.abs(dx) + Math.abs(dy) > (drag.touch ? 9 : 4)) drag.moved = true;
-    if (drag.moved) { cam.x = drag.cx - dx / cam.zoom; cam.y = drag.cy - dy / cam.zoom; clampCam(); }
+    if (drag.moved) { panScreen(-(e.clientX - drag.lx), -(e.clientY - drag.ly)); clampCam(); }
+    drag.lx = e.clientX; drag.ly = e.clientY;
     return;
   }
   if (placing) {
@@ -186,6 +188,8 @@ function onKey(e) {
     case '3': setSpeed(4); break;
     case ' ': e.preventDefault(); centerPlayer(); break;
     case 'f': takePhoto(); break;
+    case 'q': if (!inside()) rotateCam(-1); break;
+    case 'e': if (!inside()) rotateCam(1); break;
     case '+': case '=': zoomAt(cam.W / 2, cam.H / 2, 1.15); break;
     case '-': case '_': zoomAt(cam.W / 2, cam.H / 2, 1 / 1.15); break;
   }
@@ -193,10 +197,10 @@ function onKey(e) {
 function clampCam() {
   if (inside()) {   // внутри дома камера гуляет в пределах комнаты (на телефоне она может не помещаться целиком)
     const h = homeOf(); if (!h) return;
-    cam.x = Math.max(-h.in.d * HW - 40, Math.min(h.in.w * HW + 40, cam.x)); cam.y = Math.max(-200, Math.min((h.in.w + h.in.d) * HH + 60, cam.y));
+    cam.tx = Math.max(-1, Math.min(h.in.w + 1, cam.tx)); cam.ty = Math.max(-1, Math.min(h.in.d + 1, cam.ty));
     return;
   }
-  cam.x = Math.max(-N * HW * .9, Math.min(N * HW * .9, cam.x)); cam.y = Math.max(0, Math.min(N * 2 * HH, cam.y));
+  cam.tx = Math.max(-2, Math.min(N + 2, cam.tx)); cam.ty = Math.max(-2, Math.min(N + 2, cam.ty));
 }
 
 // ---------------------------------------------------------------- призрак
@@ -302,17 +306,17 @@ function clickInterior(mx, my, dbl) {
 
 // ---------------------------------------------------------------- обновление
 export function updateInput(dt) {
-  if (cam.goto) { const k = Math.min(1, dt * 7), g = cam.goto; cam.y += g.dy * k; g.dy *= 1 - k; if (Math.abs(g.dy) < 0.5) cam.goto = null; }
+  if (cam.goto) { const k = Math.min(1, dt * 7), g = cam.goto; panScreen(0, g.dy * k); g.dy *= 1 - k; if (Math.abs(g.dy) < 0.5) cam.goto = null; }
   // камера
   if (!inside() && !UI.modal) {
-    let dx = 0, dy = 0; const sp = 700 / cam.zoom * dt;
+    let dx = 0, dy = 0; const sp = 700 * dt;
     if (keys.has('a') || keys.has('arrowleft')) dx -= sp; if (keys.has('d') || keys.has('arrowright')) dx += sp;
     if (keys.has('w') || keys.has('arrowup')) dy -= sp; if (keys.has('s') || keys.has('arrowdown')) dy += sp;
-    if (dx || dy) { cam.x += dx; cam.y += dy; clampCam(); }
+    if (dx || dy) { panScreen(dx, dy); clampCam(); }
     else if (G.player.moving && !drag) {
       const [sx, sy] = worldToScreen(G.player.x, G.player.y, 14), mx = cam.W * .28, my = cam.H * .26;
       let ox = 0, oy = 0; if (sx < mx) ox = sx - mx; else if (sx > cam.W - mx) ox = sx - (cam.W - mx); if (sy < my) oy = sy - my; else if (sy > cam.H - my - 90) oy = sy - (cam.H - my - 90);
-      if (ox || oy) { const k = Math.min(1, dt * 3); cam.x += ox / cam.zoom * k; cam.y += oy / cam.zoom * k; }
+      if (ox || oy) { const k = Math.min(1, dt * 3); panScreen(ox * k, oy * k); }
     }
   }
   if (UI.tool === 'build') updateGhost(false);
@@ -336,10 +340,11 @@ export function updateInput(dt) {
 }
 
 export function takePhoto() {
-  const ui = document.getElementById('ui'), canvas = document.getElementById('game');
+  const ui = document.getElementById('ui');
   ui.style.visibility = 'hidden'; hideTip();
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    canvas.toBlob((blob) => {
+    const cv = captureFrame(document.getElementById('overlay'));
+    cv.toBlob((blob) => {
       ui.style.visibility = '';
       if (!blob) return;
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `ostrov-den-${day() + 1}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);

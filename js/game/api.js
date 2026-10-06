@@ -140,8 +140,23 @@ export function finishBuild(b) {
   if (HINTS[def.id] && !G.flags['h_' + def.id]) { G.flags['h_' + def.id] = 1; toast(HINTS[def.id]); }
   S.hooks.onPlaced && S.hooks.onPlaced(b);
 }
+// персонаж сидит или спит на предмете: клетка под ним занята самим предметом, это нормально — двигать его не нужно
+export const isSeated = () => { const p = G.player; return !!(p.sleeping || p.fx === 'sit' || p.fx === 'sleep' || p.fx === 'nap'); };
+// встать: вернуться на место, где стоял до того, как сесть/лечь (если оно занято — на ближайшую свободную клетку)
+export function leaveSeat() {
+  const p = G.player;
+  if (p.restPos) { p.x = p.restPos.x; p.y = p.restPos.y; p.restPos = null; }
+  const wasWork = p.fx === 'sit' || p.fx === 'sleep' || p.fx === 'nap';
+  p.sleeping = false; if (wasWork) { p.fx = null; p.work = null; }
+  if (G.scene === 'world') nudgeWorldPlayer(); else S.hooks.nudgeIndoor && S.hooks.nudgeIndoor();
+}
+// предмет под сидящим убрали (снос, продажа): он встаёт, а не «сидит в воздухе»
+export function seatRemoved(x, y, w, d) {
+  const p = G.player;
+  if (isSeated() && p.x >= x && p.x < x + w && p.y >= y && p.y < y + d) leaveSeat();
+}
 export function nudgeWorldPlayer() {
-  const p = G.player; if (G.scene !== 'world' || !G.blk[ti(Math.floor(p.x), Math.floor(p.y))]) return;
+  const p = G.player; if (G.scene !== 'world' || isSeated() || !G.blk[ti(Math.floor(p.x), Math.floor(p.y))]) return;
   for (let r = 1; r < 9; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
     const x = Math.floor(p.x) + dx, y = Math.floor(p.y) + dy;
     if (inB(x, y) && !G.blk[ti(x, y)]) { p.x = x + .5; p.y = y + .5; p.path = []; return; }
@@ -169,6 +184,7 @@ export function demolish(b) {
   const def = BDEF[b.t];
   eco.refund(refundOf(b), b.bld ? 1 : 0.6);   // отмена стройки возвращает всё
   if (b.in) for (const it of b.in.items) { const fd = S.furnDef && S.furnDef(it.t); if (fd) eco.refund(fd.cost, 0.6); }
+  seatRemoved(b.x, b.y, b.w, b.d);
   removeBld(b);
   G.pets = G.pets.filter((p) => p.home !== b.id);
   fx.dust(b.x + b.w / 2, b.y + b.d / 2, 10); sfx('remove');
@@ -335,6 +351,10 @@ export function takeCompost(b) {
 // компост рядом с грядкой (зазор между постройками до 3 клеток): сам удобряет посевы
 const gap = (a, b) => Math.hypot(Math.max(a.x - (b.x + b.w), b.x - (a.x + a.w), 0), Math.max(a.y - (b.y + b.d), b.y - (a.y + a.d), 0));
 export function compostsNear(b) { const out = []; for (const o of G.bMap.values()) if (BDEF[o.t].compost && gap(o, b) <= 3) out.push(o); return out; }
+// пугало действует на грядки, до которых от него не больше 4 клеток (радиус кольца на призраке)
+const SCARE_R = 4;
+export function scarecrowsNear(b) { const out = []; for (const o of G.bMap.values()) if (BDEF[o.t].tags.includes('scarecrow') && !o.bld && o !== b && gap(o, b) <= SCARE_R) out.push(o); return out; }
+export function cropsInScare(b) { const out = []; for (const o of G.bMap.values()) if (BDEF[o.t].crops && gap(o, b) <= SCARE_R) out.push(o); return out; }
 export function cropsNear(b) { const out = []; for (const o of G.bMap.values()) if (BDEF[o.t].crops && gap(o, b) <= 3) out.push(o); return out; }
 // грядки
 export function plantCrop(b, plotIdx, crop) {
@@ -454,8 +474,8 @@ export function sitAt(b) {
   const def = BDEF[b.t], s = def.sit, p = G.player;
   const ok = pl.goToRect(b.x, b.y, b.w, b.d, () => {
     const prev = { x: p.x, y: p.y };
-    if (!def.flat) { p.x = b.x + b.w / 2; p.y = b.y + b.d / 2; }
-    pl.startWork('Отдыхаю', s.dur, 'sit', () => { if (!def.flat) { p.x = prev.x; p.y = prev.y; } finishSit(b, def, s); }, { faceTo: [b.x + b.w / 2 + 1, b.y + b.d / 2 + 1] });
+    if (!def.flat) { p.x = b.x + b.w / 2; p.y = b.y + b.d / 2; p.restPos = prev; }
+    pl.startWork('Отдыхаю', s.dur, 'sit', () => { if (!def.flat) { p.x = prev.x; p.y = prev.y; p.restPos = null; nudgeWorldPlayer(); } finishSit(b, def, s); }, { faceTo: [b.x + b.w / 2 + 1, b.y + b.d / 2 + 1] });
   });
   if (!ok) toast('Туда не добраться', 'warn');
 }
@@ -475,11 +495,11 @@ export function startSleep(kind, quality = 1, label = 'Сплю') {
   p.sleeping = true; p.sleepQ = quality; p.fx = kind === 'nap' ? 'nap' : 'sleep'; p.path = []; p.work = null; p.sleepKind = kind;
   S.hooks.onSleep && S.hooks.onSleep();
 }
-export function wakeUp() { const p = G.player; if (!p.sleeping) return; p.sleeping = false; p.fx = null; toast('Проснулся. Доброе утро ☀️'); }
+export function wakeUp() { const p = G.player; if (!p.sleeping) return; leaveSeat(); toast('Проснулся. Доброе утро ☀️'); }
 export function napAt(b) {
   const def = BDEF[b.t];
   if (G.needs.energy > 90) { toast('Совсем не хочется спать'); return; }
-  doAt(b, 'Устраиваюсь', 1.2, 'pick', () => { G.player.x = b.x + b.w / 2; G.player.y = b.y + b.d / 2 - .2; startSleep('nap', def.nap.rate); });
+  doAt(b, 'Устраиваюсь', 1.2, 'pick', () => { const p = G.player; p.restPos = { x: p.x, y: p.y }; p.x = b.x + b.w / 2; p.y = b.y + b.d / 2 - .2; startSleep('nap', def.nap.rate); });
 }
 export function stargaze(b) {
   const night = isNight();
@@ -579,6 +599,8 @@ export function linksOf(b) {
   }
   if (def.crops) for (const o of compostsNear(b)) add(o, '#9bc46a');
   if (def.compost) for (const o of cropsNear(b)) add(o, '#9bc46a');
+  if (def.crops) for (const o of scarecrowsNear(b)) add(o, '#f0cf6a');
+  if (def.tags.includes('scarecrow')) for (const o of cropsInScare(b)) add(o, '#f0cf6a');
   for (const o of b.nb) {
     const od = BDEF[o.t];
     if (def.needs?.includes('heat') && isHot(o)) add(o, '#ff9a50');
@@ -598,6 +620,8 @@ export function linksForGhost(def, fake) {
     if (!def.net?.[type]) continue;
     for (const o of fake.nb) if (BDEF[o.t].net?.[type]) out.push({ b: o, col: type === 'water' ? '#6cc4ee' : '#ffd36e' });
   }
+  if (def.crops) for (const o of G.bMap.values()) if (BDEF[o.t].tags.includes('scarecrow') && !o.bld && gap(o, fake) <= SCARE_R) out.push({ b: o, col: '#f0cf6a' });
+  if (def.tags.includes('scarecrow')) for (const o of cropsInScare(fake)) out.push({ b: o, col: '#f0cf6a' });
   for (const o of fake.nb) {
     const od = BDEF[o.t];
     if (def.needs?.includes('heat') && isHot(o)) out.push({ b: o, col: '#ff9a50' });

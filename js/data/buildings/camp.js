@@ -1,5 +1,5 @@
 import { reg } from './registry.js';
-import { P, box, cyl, cone, blob, shadow, line3, poly, plane, gable, pyramid, flame, wallRect, diamond } from '../../core/iso.js';
+import { P, box, cyl, cone, blob, shadow, line3, poly, plane, gable, pyramid, flame, wallRect, diamond, curve3, ribbon, glow } from '../../core/iso.js';
 import { shade } from '../../core/util.js';
 
 reg([
@@ -53,9 +53,8 @@ reg([
     draw(c, b) {
       const w = b.cw; shadow(c, w / 2, .5, .55 * w, .14);
       for (const x of [.1, w - .1]) cyl(c, x, .5, 0, .05, 44, '#7b5535');
-      const a = P(.1, .5, 40), m = P(w / 2, .5, 18), e = P(w - .1, .5, 40);
-      c.fillStyle = '#e07a7a'; c.beginPath(); c.moveTo(a[0], a[1]); c.quadraticCurveTo(m[0], m[1] + 6, e[0], e[1]); c.quadraticCurveTo(m[0], m[1] + 24, a[0], a[1]); c.fill();
-      c.strokeStyle = '#f3cfa0'; c.lineWidth = 2.2; c.beginPath(); c.moveTo(a[0], a[1]); c.quadraticCurveTo(m[0], m[1] + 6, e[0], e[1]); c.stroke();
+      ribbon(c, [.1, .5, 40], [w / 2, .5, 4], [w - .1, .5, 40], .28, '#e07a7a', 10);
+      curve3(c, [.1, .22, 40], [w / 2, .22, 4], [w - .1, .22, 40], '#f3cfa0', 2.2, 10); curve3(c, [.1, .78, 40], [w / 2, .78, 4], [w - .1, .78, 40], '#f3cfa0', 2.2, 10);
     },
   },
   {
@@ -90,7 +89,7 @@ reg([
       line3(c, [.25, .3, 0], [.5, .5, 30], '#7b5535', 2.4); line3(c, [.75, .3, 0], [.5, .5, 30], '#7b5535', 2.4); line3(c, [.5, .78, 0], [.5, .5, 30], '#7b5535', 2.4);
       cyl(c, .5, .5, 10, .24, 13, '#3c3f45', { top: '#25282c' }); cyl(c, .5, .5, 21, .2, 2, '#9a5a30', { top: '#c98a50' });
     },
-    anim(c, b, t) { if (b.st.busy) { const [x, y] = P(.5, .5, 28); c.fillStyle = 'rgba(255,255,255,.45)'; for (let i = 0; i < 3; i++) { const k = (t * .8 + i / 3) % 1; c.beginPath(); c.arc(x + Math.sin(k * 6 + i) * 3, y - k * 18, 3 + k * 3, 0, 7); c.globalAlpha = 1 - k; c.fill(); } c.globalAlpha = 1; } },
+    anim(c, b, t) { if (b.st.busy) for (let i = 0; i < 3; i++) { const k = (t * .8 + i / 3) % 1, dx = Math.sin(k * 6 + i) * 3; blob(c, .5 + dx / 64, .5 - dx / 64, 28 + k * 18, 3 + k * 3, 3 + k * 3, `rgba(255,255,255,${(.45 * (1 - k)).toFixed(3)})`); } },
   },
   {
     id: 'kettle', name: 'Чайник', cat: 'camp', icon: '🫖', cost: { scrap: 2, sticks: 1 }, req: ['campfire'], h: 34, cozy: 2,
@@ -102,6 +101,6 @@ reg([
       cyl(c, .5, .5, 4, .2, 12, '#c9573f', { top: '#e07a5a' }); blob(c, .5, .5, 18, 6, 4.5, '#c9573f');
       line3(c, [.7, .5, 10], [.82, .5, 16], '#c9573f', 3); line3(c, [.3, .5, 16], [.3, .5, 22], '#3c3f45', 2); line3(c, [.7, .5, 16], [.5, .5, 26], '#3c3f45', 2); line3(c, [.3, .5, 22], [.5, .5, 26], '#3c3f45', 2);
     },
-    anim(c, b, t) { if (b.st.busy) { const [x, y] = P(.82, .5, 16); c.fillStyle = 'rgba(255,255,255,.5)'; for (let i = 0; i < 3; i++) { const k = (t * .9 + i / 3) % 1; c.globalAlpha = 1 - k; c.beginPath(); c.arc(x + k * 6, y - k * 16, 2 + k * 2.5, 0, 7); c.fill(); } c.globalAlpha = 1; } },
+    anim(c, b, t) { if (b.st.busy) for (let i = 0; i < 3; i++) { const k = (t * .9 + i / 3) % 1; blob(c, .82 + k * 6 / 64, .5 - k * 6 / 64, 16 + k * 16, 2 + k * 2.5, 2 + k * 2.5, `rgba(255,255,255,${(.5 * (1 - k)).toFixed(3)})`); } },
   },
 ]);

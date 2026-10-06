@@ -1,12 +1,12 @@
 import { reg } from './registry.js';
-import { P, box, cyl, blob, shadow, line3, poly, plane, gable, pyramid, wallRect, lean } from '../../core/iso.js';
+import { P, box, cyl, blob, shadow, line3, poly, plane, gable, pyramid, wallRect, lean, curve3, ribbon, glow } from '../../core/iso.js';
 
 reg([
   {
     id: 'basket', name: 'Корзина', cat: 'store', icon: '🧺', cost: { sticks: 6, fiber: 4 }, h: 36, cozy: 1,
     desc: 'Плетёная корзина для припасов: больше места для еды и семян. Если поставить рядом с мастерской, курятником, ульем — сама заберёт продукцию.',
     tags: ['storage'], cap: { food: 20, seed: 10 },
-    draw(c) { shadow(c, .5, .5, .34, .16); cyl(c, .5, .5, 0, .3, 14, '#c9a05a', { rings: [.3, .62], top: '#8a6a3a' }); const a = P(.2, .5, 14), b2 = P(.8, .5, 14), m = P(.5, .5, 34); c.strokeStyle = '#a9803f'; c.lineWidth = 2.4; c.beginPath(); c.moveTo(a[0], a[1]); c.quadraticCurveTo(m[0], m[1], b2[0], b2[1]); c.stroke(); },
+    draw(c) { shadow(c, .5, .5, .34, .16); cyl(c, .5, .5, 0, .3, 14, '#c9a05a', { rings: [.3, .62], top: '#8a6a3a' }); curve3(c, [.2, .5, 14], [.5, .5, 34], [.8, .5, 14], '#a9803f', 2.4); },
   },
   {
     id: 'crate', name: 'Ящик', cat: 'store', icon: '📦', cost: { wood: 6 }, h: 34, cozy: 1,

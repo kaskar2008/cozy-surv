@@ -20,7 +20,7 @@ export function pathToRectGrid(g, sx, sy, x, y, w, d) {
 }
 
 export function cancelAll() { const p = G.player; p.path = []; p.onArrive = null; p.work = null; p.fx = null; }
-export function faceTo(x, y) { const p = G.player; const sx = (x - p.x) - (y - p.y); if (Math.abs(sx) > 0.05) p.face = sx >= 0 ? 1 : -1; }
+export function faceTo(x, y) { const p = G.player; if (Math.abs(x - p.x) + Math.abs(y - p.y) > 0.05) p.ang = Math.atan2(y - p.y, x - p.x); const sx = (x - p.x) - (y - p.y); if (Math.abs(sx) > 0.05) p.face = sx >= 0 ? 1 : -1; }
 
 export function goTo(tx, ty, cb) {
   const p = G.player, g = grid();
@@ -59,7 +59,7 @@ export function updatePlayer(dt) {
     if (dist <= step) { p.x = tx; p.y = ty; p.path.shift(); if (!p.path.length) { const cb = p.onArrive; p.onArrive = null; if (cb) cb(); } }
     else { p.x += dx / dist * step; p.y += dy / dist * step; }
     const sx = dx - dy; if (Math.abs(sx) > 0.02) p.face = sx >= 0 ? 1 : -1;
-    p.moving = true;
+    p.ang = Math.atan2(dy, dx); p.moving = true;
   }
   if (p.work) {
     const w = p.work; w.prog += dt * workSpeed(); p.workT = w.prog;

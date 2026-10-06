@@ -1,7 +1,7 @@
 // Частицы, всплывающие подписи и «живность» вокруг: бабочки, светлячки, птицы.
 import { G, N, season, darkness } from '../game/state.js';
-import { P, proj } from '../core/iso.js';
 import { cam, worldToScreen, viewTiles } from './camera.js';
+const proj = (x, y, z) => worldToScreen(x, y, z);
 import { rnd, pick } from '../core/util.js';
 
 export const fxs = { scope: null };
@@ -31,15 +31,16 @@ export function update(dt0, rdt = dt0) {
   for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i], dt = f.live ? rdt : dt0; f.life -= dt; f.z += 14 * dt; if (f.life <= 0) floats.splice(i, 1); }
 }
 export function drawParts(c) {
+  const zm = Math.max(.7, cam.zoom);
   for (const p of parts) {
     if (p.sc !== G.scene) continue;
     const [X, Y] = proj(p.x, p.y, p.z), k = p.life / p.max;
-    if (p.type === 'smoke') { c.globalAlpha = (p.a ?? .5) * k; c.fillStyle = p.col; c.beginPath(); c.arc(X, Y, p.size, 0, 7); c.fill(); }
-    else if (p.type === 'spark') { c.globalAlpha = Math.min(1, k * 1.6); c.fillStyle = p.col; c.beginPath(); c.arc(X, Y, p.size * (.5 + k * .5), 0, 7); c.fill(); }
-    else if (p.type === 'text') { c.globalAlpha = Math.min(1, k * 1.8); c.fillStyle = p.col; c.font = `${p.size}px sans-serif`; c.textAlign = 'center'; c.fillText(p.txt, X, Y); }
+    if (p.type === 'smoke') { c.globalAlpha = (p.a ?? .5) * k; c.fillStyle = p.col; c.beginPath(); c.arc(X, Y, p.size * zm, 0, 7); c.fill(); }
+    else if (p.type === 'spark') { c.globalAlpha = Math.min(1, k * 1.6); c.fillStyle = p.col; c.beginPath(); c.arc(X, Y, p.size * zm * (.5 + k * .5), 0, 7); c.fill(); }
+    else if (p.type === 'text') { c.globalAlpha = Math.min(1, k * 1.8); c.fillStyle = p.col; c.font = `${p.size * zm}px sans-serif`; c.textAlign = 'center'; c.fillText(p.txt, X, Y); }
   }
   c.globalAlpha = 1;
-  c.textAlign = 'center'; c.font = '600 13px ui-rounded, system-ui, sans-serif';
+  c.textAlign = 'center'; c.font = `600 ${13 * Math.max(.9, zm)}px ui-rounded, system-ui, sans-serif`;
   for (const f of floats) {
     if (f.sc !== G.scene) continue;
     const [X, Y] = proj(f.x, f.y, f.z), a = Math.min(1, f.life / .6);
@@ -70,18 +71,19 @@ export function ambient(dt, t, w) {
   for (let i = birds.length - 1; i >= 0; i--) { const b = birds[i]; b.x += b.vx * dt; if (b.x > N + 6) birds.splice(i, 1); }
 }
 export function drawAmbient(c, t) {
+  const zm = Math.max(.7, cam.zoom);
   for (const b of bflies) {
-    const [X, Y] = proj(b.x, b.y, 14 + Math.sin(t * 3 + b.a) * 5), f = Math.abs(Math.sin(t * 14 + b.a)) * 4 + 1;
-    c.fillStyle = b.col; c.beginPath(); c.ellipse(X - 2, Y, f, 3, -.4, 0, 7); c.ellipse(X + 2, Y, f, 3, .4, 0, 7); c.fill();
+    const [X, Y] = proj(b.x, b.y, 14 + Math.sin(t * 3 + b.a) * 5), f = (Math.abs(Math.sin(t * 14 + b.a)) * 4 + 1) * zm;
+    c.fillStyle = b.col; c.beginPath(); c.ellipse(X - 2 * zm, Y, f, 3 * zm, -.4, 0, 7); c.ellipse(X + 2 * zm, Y, f, 3 * zm, .4, 0, 7); c.fill();
   }
   for (const f of flies) {
     const [X, Y] = proj(f.x, f.y, f.z + Math.sin(t * 2 + f.ph) * 4), a = .5 + .5 * Math.sin(t * 3 + f.ph);
-    c.fillStyle = `rgba(230,255,140,${a})`; c.beginPath(); c.arc(X, Y, 1.8, 0, 7); c.fill();
-    c.fillStyle = `rgba(230,255,140,${a * .25})`; c.beginPath(); c.arc(X, Y, 6, 0, 7); c.fill();
+    c.fillStyle = `rgba(230,255,140,${a})`; c.beginPath(); c.arc(X, Y, 1.8 * zm, 0, 7); c.fill();
+    c.fillStyle = `rgba(230,255,140,${a * .25})`; c.beginPath(); c.arc(X, Y, 6 * zm, 0, 7); c.fill();
   }
-  c.strokeStyle = 'rgba(40,40,50,.55)'; c.lineWidth = 1.6; c.lineCap = 'round';
+  c.strokeStyle = 'rgba(40,40,50,.55)'; c.lineWidth = 1.6 * zm; c.lineCap = 'round';
   for (const b of birds) for (let i = 0; i < b.n; i++) {
-    const [X, Y] = proj(b.x - i * .9, b.y + (i % 2 ? 1 : -1) * i * .5, 70 + i * 4), fl = Math.sin(t * 9 + b.ph + i) * 5;
-    c.beginPath(); c.moveTo(X - 7, Y + fl * .3); c.lineTo(X, Y - fl * .2 + 2); c.lineTo(X + 7, Y + fl * .3); c.stroke();
+    const [X, Y] = proj(b.x - i * .9, b.y + (i % 2 ? 1 : -1) * i * .5, 70 + i * 4), fl = Math.sin(t * 9 + b.ph + i) * 5 * zm;
+    c.beginPath(); c.moveTo(X - 7 * zm, Y + fl * .3); c.lineTo(X, Y - fl * .2 + 2 * zm); c.lineTo(X + 7 * zm, Y + fl * .3); c.stroke();
   }
 }
