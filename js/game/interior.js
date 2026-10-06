@@ -4,7 +4,7 @@ import { BDEF } from '../data/buildings/index.js';
 import { FDEF, WALLH, WALL_STYLES, FLOOR_STYLES } from '../data/furniture.js';
 import * as eco from './eco.js';
 import * as pl from './player.js';
-import { S, toast, stat, addBuff, doAt, defOf, isBuilt, startSleep, takeWaterFor, waterAvailable } from './api.js';
+import { S, toast, stat, addBuff, doAt, defOf, isBuilt, startSleep, takeWaterFor, waterAvailable, isSeated, seatRemoved } from './api.js';
 import { ringTiles, walkable, inB } from './world.js';
 import { isHot } from './nets.js';
 import { itemName, itemIcon } from '../data/items.js';
@@ -120,17 +120,19 @@ export function placeFurn(home, def, x, y, rot, wall) {
   home.in.items.push(it);
   G.built[def.id] = (G.built[def.id] || 0) + 1; stat('furn');
   rebuildInterior(home);
-  const p = G.player; if (G.interior.blocked(Math.floor(p.x), Math.floor(p.y))) nudgePlayer();
+  const p = G.player; if (!isSeated() && G.interior.blocked(Math.floor(p.x), Math.floor(p.y))) nudgePlayer();
   it.pop = performance.now() / 1000; sfx('place'); fx.dust(x + it.w / 2, y + it.d / 2, 6);
   G.dirtyLinks = true;
   return it;
 }
+S.hooks.nudgeIndoor = () => { if (G.interior && G.interior.blocked(Math.floor(G.player.x), Math.floor(G.player.y))) nudgePlayer(); };
 function nudgePlayer() {
   const p = G.player, g = G.interior;
   for (let r = 1; r < 6; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const x = Math.floor(p.x) + dx, y = Math.floor(p.y) + dy; if (!g.blocked(x, y)) { p.x = x + .5; p.y = y + .5; return; } }
 }
 export function removeFurn(home, it) {
   const d = FDEF[it.t]; eco.refund(d.cost, 0.8);
+  seatRemoved(it.x, it.y, it.w, it.d);
   home.in.items = home.in.items.filter((o) => o !== it);
   rebuildInterior(home); sfx('remove'); G.dirtyLinks = true;
   if (G.sel && G.sel.uid === it.uid) G.sel = null;
@@ -232,13 +234,13 @@ export function furnActions(home, it) {
   const A = (label, run, extra = {}) => acts.push({ label, run, ...extra });
   if (d.sleep) A(`Лечь спать (качество ×${d.sleep.q})`, () => {
     if (G.needs.energy > 92) { toast('Совсем не хочется спать'); return; }
-    goItem(home, it, 'Укладываюсь', 1.2, 'pick', () => { const p = G.player; p.x = it.x + it.w / 2; p.y = it.y + it.d / 2 - .1; let q = d.sleep.q; if (G.cozy.list.some((l) => l.id === 'sleep_nook')) q += .25; startSleep('bed', q); });
+    goItem(home, it, 'Укладываюсь', 1.2, 'pick', () => { const p = G.player; p.restPos = { x: p.x, y: p.y }; p.x = it.x + it.w / 2; p.y = it.y + it.d / 2 - .1; let q = d.sleep.q; if (G.cozy.list.some((l) => l.id === 'sleep_nook')) q += .25; startSleep('bed', q); });
   });
   if (d.sit) A('Посидеть', () => {
     const p = G.player;
     const ok = pl.goToRect(it.x, it.y, it.w, it.d, () => {
-      const prev = { x: p.x, y: p.y }; p.x = it.x + it.w / 2; p.y = it.y + it.d / 2;
-      pl.startWork('Отдыхаю', d.sit.dur, 'sit', () => { p.x = prev.x; p.y = prev.y; finishSitIt(d); }, { faceTo: [it.x + it.w / 2 + 1, it.y + it.d / 2 + 1] });
+      const prev = { x: p.x, y: p.y }; p.x = it.x + it.w / 2; p.y = it.y + it.d / 2; p.restPos = prev;
+      pl.startWork('Отдыхаю', d.sit.dur, 'sit', () => { p.x = prev.x; p.y = prev.y; p.restPos = null; if (G.interior?.blocked(Math.floor(p.x), Math.floor(p.y))) nudgePlayer(); finishSitIt(d); }, { faceTo: [it.x + it.w / 2 + 1, it.y + it.d / 2 + 1] });
     });
     if (!ok) toast('Туда не пройти — проверь расстановку', 'warn');
   });
