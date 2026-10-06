@@ -75,7 +75,7 @@ function drawFiber(c, n, o) {
   const col = ['#8fcf6a', '#78bd55', '#c2b556', '#bcd0c9'][o.season];
   if (n.st === 'empty') { const d = shade(col, -.2); for (const a of [0, 2.3, 4.4]) line3(c, [.5 + Math.cos(a) * .04, .5 + Math.sin(a) * .04, 0], [.5 + Math.cos(a) * .08, .5 + Math.sin(a) * .08, 5], d, 2); return; }
   for (let i = 0; i < 9; i++) {   // пучок: стебли расходятся веером во все стороны
-    const a = i * 2.4 + n.v * .3, hh = 15 + ((n.v * 7 + i * 5) % 9), r0 = .03 + .025 * (i % 3), r1 = r0 + .09 + .05 * ((i * 5) % 3);
+    const a = i * 2.4 + n.v * .3, hh = 15 + ((n.v * 7 + i * 5) % 9), r0 = .05 + .04 * (i % 3), r1 = r0 + .1 + .06 * ((i * 5) % 3);
     line3(c, [.5 + Math.cos(a) * r0, .5 + Math.sin(a) * r0, 0], [.5 + Math.cos(a) * r1, .5 + Math.sin(a) * r1, hh], shade(col, ((i % 3) - 1) * .08), 2.6);
   }
 }
@@ -110,10 +110,10 @@ function drawReeds(c, n, o) {
   const col = ['#7db860', '#6aa655', '#b5a455', '#b7c0a8'][o.season];
   const full = n.st !== 'empty';
   for (let i = 0; i < (full ? 8 : 3); i++) {   // стебли по кругу, чтобы пучок был виден с любой стороны
-    const a = i * 2.4 + n.v, hh = (full ? 32 : 10) + ((n.v + i * 3) % 7) * 2, r0 = .05 + .035 * (i % 4), r1 = r0 + .05;
+    const a = i * 2.4 + n.v, hh = (full ? 32 : 10) + ((n.v + i * 3) % 7) * 2, r0 = .1 + .075 * (i % 4) + .03 * ((n.v + i) % 3), r1 = r0 + .06;
     const bx = .5 + Math.cos(a) * r0, by = .5 + Math.sin(a) * r0, tx = .5 + Math.cos(a) * r1, ty = .5 + Math.sin(a) * r1;
-    line3(c, [bx, by, 0], [tx, ty, hh], col, 2.6);
-    if (full && i % 2 === 0) line3(c, [tx, ty, hh - 6], [tx, ty, hh + 1], '#8a5a34', 4);
+    line3(c, [bx, by, 0], [tx, ty, hh], col, 2);
+    if (full && i % 2 === 0) line3(c, [tx, ty, hh - 6], [tx, ty, hh + 1], '#8a5a34', 3.4);
   }
 }
 function drawClay(c, n) {
