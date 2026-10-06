@@ -1,5 +1,5 @@
 // Ресурсные объекты мира: рисование и правила сбора.
-import { shadow, blob, cyl, cone, line3, poly, P, plane, box, curve3, ribbon, glow } from '../core/iso.js';
+import { shadow, blob, cyl, cone, line3, poly, P, plane, box, curve3, ribbon, glow, frustum, leaf } from '../core/iso.js';
 import { shade } from '../core/util.js';
 
 const FOL = {
@@ -16,99 +16,143 @@ const ring = (dx) => { const m = dx / 45.25, a = Math.abs(dx) * .9 + 1; return [
 const snowCap = (c, cx, z, rx, ry) => { const [x, y] = ring(cx); blob(c, x, y, z, rx, ry, '#f4f8fa', { lo: '#cfdde3' }); };
 const vv = (n) => (Math.floor((n.v % 15) / 3) - 2) * 0.025;
 
-function drawStump(c) { shadow(c, .5, .5, .22, .16); cyl(c, .5, .5, 0, .13, 7, '#8a6240', { top: '#c9a273' }); }
-function drawSapling(c, season) { shadow(c, .5, .5, .12, .12); cyl(c, .5, .5, 0, .02, 10, '#8a6a45'); blob(c, .5, .5, 13, 8, 6, FOL.oak[season] || '#7bc35a'); }
+// ── общие помощники ──
+const hash = (a, b = 0) => { const h = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return h - Math.floor(h); };
+const rot2 = (x, y, a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
+// точка на поверхности шара B {x, y, z, rx, ry} по азимуту a и возвышению e (чуть снаружи): сюда «приклеиваем» ягоды и яблоки
+const surf = (B, a, e, k = 1.05) => { const R = B.rx / 45.25 * Math.cos(e) * k; return [B.x + Math.cos(a) * R, B.y + Math.sin(a) * R, B.z + Math.sin(e) * B.ry * k]; };
+// шары кроны: spec — [смещение x, y в клетках, высота центра, радиус px]; поворот a0, коэффициент размера sc
+const crown = (spec, a0, sc = 1) => spec.map(([ox, oy, z, r]) => { const [x, y] = rot2(ox * sc, oy * sc, a0); return { x: .5 + x, y: .5 + y, z, rx: r * sc, ry: r * sc * .88 }; });
+const drawBlobs = (c, bl, col, tintAt) => bl.forEach((B, i) => blob(c, B.x, B.y, B.z, B.rx, B.ry, shade(col, tintAt(B, i))));
+
+function drawStump(c) {
+  shadow(c, .5, .5, .26, .16);
+  for (let i = 0; i < 5; i++) { const a = i * 1.257 + .3; line3(c, [.5, .5, 7], [.5 + Math.cos(a) * .22, .5 + Math.sin(a) * .22, 0], '#7a5636', 5.5); }   // корни расходятся от пня
+  cyl(c, .5, .5, 0, .14, 9, '#8a6240', { top: '#e0c08a' });
+  cyl(c, .5, .5, 9.2, .09, .5, '#c9a06a');   // годовое кольцо на срезе
+}
+function drawSapling(c, season) {
+  shadow(c, .5, .5, .14, .12); cyl(c, .5, .5, 0, .022, 12, '#8a6a45');
+  const col = FOL.oak[season] || '#7bc35a';
+  for (const [ox, oy, z, r] of [[0, 0, 15, 7.5], [.09, .05, 10, 5.5], [-.08, .06, 9, 5]]) blob(c, .5 + ox, .5 + oy, z, r, r * .85, shade(col, ox * .5));
+}
 
 function drawTree(c, n, o, kind) {
   if (n.st === 'stump') return drawStump(c);
   if (n.st === 'sapling') return drawSapling(c, o.season);
-  const s = o.season, k = vv(n);
-  shadow(c, .5, .5, .4, .22);
-  if (kind === 'pine') {
-    cyl(c, .5, .5, 0, .07, 14, '#6e4a30');
-    const col = shade(FOL.pine[s], k);
-    cone(c, .5, .5, 8, .36, 32, shade(col, -0.05));
-    cone(c, .5, .5, 24, .30, 30, col);
-    cone(c, .5, .5, 40, .22, 28, shade(col, 0.06));
-    if (s === 3) { for (const [z, r] of [[34, 7], [50, 5.5], [64, 3.5]]) snowCap(c, 0, z, r, r * .55); }
+  const s = o.season, k = vv(n), m = Math.floor((n.v % 15) / 3), a0 = (n.v % 11) * .57;
+  shadow(c, .5, .5, .42, .22);
+  if (kind === 'pine') return drawPine(c, n, s, m);
+  const birch = kind === 'birch', tall = m === 4, tH = tall ? 40 : birch ? 32 : 24;
+  if (birch) {
+    cyl(c, .5, .5, 0, .06, tH, '#e8e2d4');
+    for (const z of [6, 13, 21, 28]) if (z < tH - 3) blob(c, .56, .56, z, 2.8, 1.1, '#5a5248');
+  } else { cone(c, .5, .5, 0, .14, 10, '#7b5535'); cyl(c, .5, .5, 0, .085, tH, '#7b5535'); }
+  if (s === 3) {   // голое дерево: ствол, развилки и снег в развилках
+    const col = birch ? '#cfc6b4' : '#6e4c30';
+    for (let i = 0; i < 4; i++) {
+      const a = a0 + i * 1.57, b1 = [.5 + Math.cos(a) * .24, .5 + Math.sin(a) * .24, tH + 22];
+      line3(c, [.5, .5, tH - 4], b1, col, 4);
+      for (const d of [-.7, .7]) { const b2 = [b1[0] + Math.cos(a + d) * .22, b1[1] + Math.sin(a + d) * .22, tH + 40 + d * 6]; line3(c, b1, b2, col, 2.8); blob(c, b2[0], b2[1], b2[2], 3.2, 2, '#f4f8fa', { rough: 0 }); }
+      blob(c, b1[0], b1[1], b1[2] + 1, 3.6, 2.2, '#f4f8fa', { rough: 0 });
+    }
     return;
   }
-  const birch = kind === 'birch';
-  cyl(c, .5, .5, 0, birch ? .06 : .08, birch ? 30 : 24, birch ? '#e8e2d4' : '#7b5535', birch ? { left: '#f4efe4', right: '#b9b2a0' } : {});
-  if (birch) for (const z of [6, 12, 20]) blob(c, .56, .56, z, 2.6, 1.1, '#5a5248');
-  if (s === 3) {
-    const top = birch ? 30 : 24;
-    for (const [dx, dy] of [[-16, -22], [14, -26], [-6, -34], [8, -14], [-20, -10], [0, -42]]) line3(c, [.5, .5, top], [.5 + dx / 64, .5 - dx / 64, top - dy], birch ? '#cfc6b4' : '#6e4c30', 2.4);
-    for (const [dx, z] of [[-16, 40], [14, 44], [-6, 52], [0, 62]]) snowCap(c, dx, z - (birch ? 0 : 6), 6, 3);
-    return;
+  const col = shade(FOL[kind === 'apple' ? 'apple' : kind][s], k), z0 = tH - 4;
+  const spec = tall ? [[.0, 0, z0 + 6, 24], [-.1, .06, z0 + 24, 20], [.1, -.06, z0 + 41, 17], [-.04, .03, z0 + 56, 12]]
+    : [[-.2, .1, z0 + 8, 22], [.21, .06, z0 + 10, 21], [0, -.22, z0 + 11, 20], [-.02, .02, z0 + 27, 22], [.1, .12, z0 + 41, 13]];
+  const bl = crown(spec, a0, birch ? .82 : 1);
+  if (!tall) for (const B of bl.slice(0, 3)) line3(c, [.5, .5, tH - 3], [B.x, B.y, B.z - 8], birch ? '#cfc6b4' : '#7b5535', 3.4);   // ветви к нижним шарам
+  drawBlobs(c, bl, col, (B, i) => (B.z - z0) / 70 * .2 - .07 + (hash(i, n.v) - .5) * .06);
+  if (kind === 'apple' && n.fruit) bl.forEach((B, i) => { for (let j = 0; j < 3; j++) { const p = surf(B, hash(i * 3 + j, n.v) * 6.28, .1 + hash(i + j, n.v + 2) * .9); blob(c, p[0], p[1], p[2], 3.6, 3.6, '#e04a3a'); } });
+}
+// ёлка: ступенчатые шестигранные «этажи», как в low-poly наборах
+function drawPine(c, n, s, m) {
+  const col = shade(FOL.pine[s], vv(n)), tiers = m >= 3 ? 5 : 4, step = 62 / tiers;
+  cyl(c, .5, .5, 0, .07, 12, '#6e4a30');
+  for (let i = 0; i < tiers; i++) {
+    const r0 = (.58 - i * (.42 / tiers)) * (1 - (m % 2) * .08), z = 8 + i * step;
+    frustum(c, .5, .5, z, r0, r0 * .5, 27, shade(col, -.06 + i * .045), { n: 7, rot: i * .45 + m, top: s === 3 ? '#f2f6f8' : shade(col, .1 + i * .04) });
   }
-  const col = shade(FOL[kind === 'apple' ? 'apple' : kind][s], k);
-  const z0 = birch ? 34 : 28, sc = birch ? .85 : 1;
-  for (const [dx, z, rx, ry, kk] of [[-14, z0 + 2, 19, 15, -.08], [14, z0 + 3, 19, 15, -.12], [0, z0 + 14, 22, 17, .0], [-6, z0 + 22, 15, 12, .08], [7, z0 + 24, 14, 11, .1]]) {
-    const [x, y] = ring(dx * sc); blob(c, x, y, z, rx * sc, ry * sc, shade(col, kk));
-  }
-  if (kind === 'apple' && n.fruit) {
-    for (const [dx, dz] of [[-16, 26], [12, 28], [-2, 40], [18, 38], [-10, 44]]) blob(c, .52 + dx / 64, .52 - dx / 64, dz + 4, 3.4, 3.4, '#e04a3a');
-  }
+  cone(c, .5, .5, 8 + (tiers - 1) * step + 25, .08, 15, shade(col, .12));
 }
 
 function drawBush(c, n, o) {
-  const s = o.season;
-  shadow(c, .5, .5, .3, .18);
-  const col = shade(['#6fbd55', '#58a846', '#a89a3c', '#7fa88a'][s], vv(n));
-  for (const [dx, z, rx, ry] of [[-9, 9, 13, 10], [9, 9, 13, 10], [0, 15, 14, 11]]) { const [x, y] = ring(dx); blob(c, x, y, z, rx, ry, col); }
-  if (s === 3) snowCap(c, 0, 20, 12, 5);
-  if (n.st === 'full' && s !== 3) {
-    const bc = n.v % 2 ? '#4a5bd0' : '#d6384c';
-    // ягоды сидят на поверхности куста со всех сторон (внутри листвы их не видно)
-    for (let i = 0; i < 16; i++) {
-      const a = i * 2.4 + n.v, z = 6 + ((i * 5) % 5) * 3.2, r = z > 13 ? .35 : .45;
-      blob(c, .5 + Math.cos(a) * r, .5 + Math.sin(a) * r, z, 4, 4, bc);
-      blob(c, .5 + Math.cos(a) * (r + .02), .5 + Math.sin(a) * (r + .02), z + 1.4, 1.1, 1.1, 'rgba(255,255,255,.7)');
+  const s = o.season, a0 = (n.v % 13) * .5;
+  shadow(c, .5, .5, .34, .18);
+  if (s === 3) {   // зимой — голые ветки со снегом
+    for (let i = 0; i < 9; i++) {
+      const a = i * .7 + a0, h = 15 + hash(i, n.v) * 11, b0 = [.5 + Math.cos(a) * .04, .5 + Math.sin(a) * .04], b1 = [.5 + Math.cos(a) * .17, .5 + Math.sin(a) * .17];
+      line3(c, [b0[0], b0[1], 0], [b1[0], b1[1], h * .6], '#8a5a34', 2.6);
+      for (const d of [-.5, .5]) { const t = [b1[0] + Math.cos(a + d) * .1, b1[1] + Math.sin(a + d) * .1, h]; line3(c, [b1[0], b1[1], h * .6], t, '#8a5a34', 1.8); if (i % 2) blob(c, t[0], t[1], t[2] + 1, 2.6, 1.8, '#f4f8fa', { rough: 0 }); }
     }
+    return;
+  }
+  const col = shade(['#80cf5c', '#62b24b', '#b3a43c', '#86ad90'][s], vv(n));
+  const bl = crown([[0, 0, 13, 15], [.17, 0, 10, 11.5], [-.1, .15, 9.5, 11], [-.1, -.15, 9.5, 10.5], [.02, 0, 22, 8.5]], a0);
+  drawBlobs(c, bl, col, (B, i) => (B.z - 10) / 30 * .12 + .02 + (hash(i, n.v) - .5) * .05);
+  if (n.st === 'full') {   // ягоды и цветы рассыпаны по поверхности шаров
+    const v3 = n.v % 3, bc = v3 === 0 ? '#d6384c' : '#4a5bd0';
+    bl.forEach((B, i) => {
+      for (let j = 0; j < 3; j++) {
+        const p = surf(B, hash(i * 7 + j, n.v) * 6.28, .12 + hash(i + j * 3, n.v + 1) * 1.05);
+        if (v3 === 2) { blob(c, p[0], p[1], p[2], 3.4, 2.4, '#ffffff'); blob(c, p[0], p[1], p[2] + 1.6, 1.5, 1.2, '#f5c42a'); }
+        else blob(c, p[0], p[1], p[2], 3.4, 3.4, bc);
+      }
+    });
   }
 }
 function drawRock(c, n, o, big) {
-  shadow(c, .5, .5, big ? .46 : .26, .2);
-  const g = '#a2a5ad';
-  const parts = big ? [[-11, 8, 17, 12, 0], [10, 7, 15, 11, -.1], [0, 17, 17, 13, .1]] : [[-4, 5, 10, 7, 0], [6, 4, 8, 6, -.1]];
-  for (const [dx, z, rx, ry, k] of parts) { const [x, y] = ring(dx); blob(c, x, y, z, rx, ry, shade(g, k + vv(n)), 'rock'); }
-  if (big && o.season !== 3) { const [x, y] = ring(-6); blob(c, x, y, 24, 8, 3.5, '#7fae5a'); }
-  if (o.season === 3) snowCap(c, big ? 0 : 0, big ? 26 : 10, big ? 12 : 6, big ? 5 : 3);
+  shadow(c, .5, .5, big ? .48 : .28, .2);
+  const g = '#a2a5ad', winter = o.season === 3;
+  const parts = big ? [[-.2, .05, 8, 18, 13], [.2, .1, 7, 15, 11], [-.02, -.12, 17, 16, 13]] : [[-.08, 0, 5, 10, 7], [.12, .04, 4, 8, 6]];
+  parts.forEach(([ox, oy, z, rx, ry], i) => blob(c, .5 + ox, .5 + oy, z, rx, ry, shade(g, i * .03 + vv(n)), { detail: 0, rough: .2 }));
+  const top = parts[big ? 2 : 0];   // мох или снег на верхней грани
+  blob(c, .5 + top[0], .5 + top[1], top[2] + top[4] * .78, top[3] * .72, top[4] * .36, winter ? '#f4f8fa' : '#7fae5a', { detail: 0, rough: .15 });
 }
 function drawFiber(c, n, o) {
   const col = ['#8fcf6a', '#78bd55', '#c2b556', '#bcd0c9'][o.season];
-  if (n.st === 'empty') { const d = shade(col, -.2); for (const a of [0, 2.3, 4.4]) line3(c, [.5 + Math.cos(a) * .04, .5 + Math.sin(a) * .04, 0], [.5 + Math.cos(a) * .08, .5 + Math.sin(a) * .08, 5], d, 2); return; }
-  for (let i = 0; i < 9; i++) {   // пучок: стебли расходятся веером во все стороны
-    const a = i * 2.4 + n.v * .3, hh = 15 + ((n.v * 7 + i * 5) % 9), r0 = .05 + .04 * (i % 3), r1 = r0 + .1 + .06 * ((i * 5) % 3);
-    line3(c, [.5 + Math.cos(a) * r0, .5 + Math.sin(a) * r0, 0], [.5 + Math.cos(a) * r1, .5 + Math.sin(a) * r1, hh], shade(col, ((i % 3) - 1) * .08), 2.6);
+  if (n.st === 'empty') { const d = shade(col, -.2); for (let i = 0; i < 4; i++) leaf(c, .5, .5, 0, i * 1.6 + n.v, .13, .06, d, 6); return; }
+  // розетка широких изогнутых листьев
+  for (let i = 0; i < 9; i++) {
+    const a = i * .7 + n.v * .3, len = .2 + hash(i, n.v) * .14;
+    leaf(c, .5, .5, 0, a, len, .15, shade(col, ((i % 3) - 1) * .07), 12 + hash(i + 3, n.v) * 11);
   }
 }
 function drawHerb(c, n, o) {
   shadow(c, .5, .5, .2, .12);
   const col = shade(['#5fbd6e', '#4fae62', '#a0a24a', '#9ab8a4'][o.season], vv(n));
   const full = n.st !== 'empty';
-  for (const [dx, dy, r] of full ? [[-7, -4, 6], [6, -3, 6], [0, -9, 7], [-1, -2, 6]] : [[0, -2, 4]]) { const [gx, gy] = ring(dx); blob(c, gx, gy, -dy + 2, r, r * .75, col); }
-  if (full && o.season < 3) for (const [dx, dy] of [[-4, -12], [5, -10], [0, -15]]) { const [gx, gy] = ring(dx); blob(c, gx + .02, gy + .02, -dy, 1.9, 1.9, '#b79ae0'); }
+  for (let i = 0; i < (full ? 6 : 3); i++) leaf(c, .5, .5, 0, i * 1.05 + n.v, .17 + hash(i, n.v) * .06, .1, shade(col, (i % 2) * .06), 9 + hash(i + 1, n.v) * 5);
+  if (full && o.season < 3) for (let j = 0; j < 2; j++) {
+    const a = n.v + j * 3.1, x = .5 + Math.cos(a) * .07, y = .5 + Math.sin(a) * .07;
+    line3(c, [x, y, 0], [x, y, 20], '#5fae4c', 1.8);
+    for (let t = 0; t < 4; t++) blob(c, x, y, 13 + t * 3.4, 2.5 - t * .35, 2.6 - t * .35, '#b79ae0', { rough: 0 });
+  }
 }
 function drawMushroom(c, n) {
-  shadow(c, .5, .5, .2, .14);
-  for (const [dx, dy, r, col] of [[-6, 0, 6, '#d65a4a'], [5, 2, 5, '#e0a24a'], [0, -3, 7, '#c94f43']]) {
-    const [gx, gy] = gp(dx, dy * .6);
-    cyl(c, gx, gy, 0, 1.8 / 45.25 * 1.3, r * .9, '#efe6d2');
-    blob(c, gx, gy, r * .9, r, r * .62, col);
-    blob(c, gx + .025, gy + .025, r * 1.35, 1.3, 1, 'rgba(255,255,255,.85)');
+  shadow(c, .5, .5, .22, .14);
+  const cols = ['#d65a4a', '#e8c24a', '#a8754a', '#f0ead8', '#c94f43'];
+  for (let i = 0; i < 3; i++) {
+    const a = i * 2.2 + n.v * .7, rr = .1 + hash(i, n.v) * .06, x = .5 + Math.cos(a) * rr, y = .5 + Math.sin(a) * rr;
+    const r = 5.5 + hash(i + 2, n.v) * 3, sh = 6 + hash(i + 5, n.v) * 4, col = cols[(n.v + i * 2) % cols.length];
+    cyl(c, x, y, 0, .04, sh, '#efe6d2');
+    const B = { x, y, z: sh + r * .25, rx: r * 1.15, ry: r * .75 };
+    blob(c, B.x, B.y, B.z, B.rx, B.ry, col, { rough: .05 });
+    if (col === '#d65a4a' || col === '#c94f43') for (let j = 0; j < 3; j++) { const p = surf(B, j * 2.1 + i, .5 + hash(j, i) * .5, 1.02); blob(c, p[0], p[1], p[2], 1.4, 1.2, '#ffffff', { rough: 0 }); }
   }
 }
 const FCOL = ['#f07aa8', '#f6d34a', '#ffffff', '#8aa8f0', '#f58a4a'];
 function drawFlowers(c, n, o) {
-  if (n.st === 'empty' || o.season === 3) { for (const dx of [-5, 0, 5]) { const [gx, gy] = gp(dx, 1); line3(c, [gx, gy, 0], [gx, gy, 6], '#6fae5a', 1.6); } return; }
+  const dry = n.st === 'empty' || o.season === 3;
+  for (let i = 0; i < 4; i++) leaf(c, .5, .5, 0, i * 1.57 + n.v, .15, .07, dry ? '#a8a068' : '#6fbf5a', 7);
+  if (dry) return;
   const col = FCOL[n.v % 5];
-  for (const [dx, dy] of [[-10, 2], [-2, -3], [8, 1], [3, 6], [-7, 7], [13, -4]]) {
-    const [gx, gy] = gp(dx, dy);
-    line3(c, [gx, gy, 0], [gx, gy, 8], '#5da84e', 1.6);
-    for (let i = 0; i < 5; i++) { const a = i * 1.2566; blob(c, gx + Math.cos(a) * 3 / 45.25, gy + Math.sin(a) * 3 / 45.25, 8.6, 2.2, 2.2, col); }
-    blob(c, gx, gy, 9, 1.6, 1.6, '#f5c84a');
+  for (let i = 0; i < 4; i++) {
+    const a = i * 1.6 + n.v * .4, x = .5 + Math.cos(a) * .12, y = .5 + Math.sin(a) * .12, h = 20 + hash(i, n.v) * 8;
+    line3(c, [x, y, 0], [x, y, h], '#5da84e', 1.8);
+    if ((n.v + i) % 3 === 0) { for (let t = 0; t < 5; t++) blob(c, x, y, h - 7 + t * 3.4, 3 - t * .4, 3 - t * .4, col, { rough: 0 }); }   // колосок вроде люпина
+    else { for (let t = 0; t < 5; t++) { const b = t * 1.2566; blob(c, x + Math.cos(b) * 3.4 / 45.25, y + Math.sin(b) * 3.4 / 45.25, h, 2.4, 2, i % 2 ? '#ffffff' : col, { rough: 0 }); } blob(c, x, y, h + .8, 1.9, 1.7, '#f5c84a', { rough: 0 }); }
   }
 }
 function drawReeds(c, n, o) {

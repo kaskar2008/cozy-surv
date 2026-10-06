@@ -250,27 +250,59 @@ export function cone(c, cx, cy, z, r, h, col) {
   }
 }
 
-// Эллипсоид («шар»/куст): rx, ry — радиусы в пикселях исходной графики; z — высота центра
-const ICO = (() => {
+// Эллипсоид («шар»/куст): rx, ry — радиусы в пикселях исходной графики; z — высота центра.
+// o.detail: 0 — грубый (20 граней, камни), 1 — обычный (80); o.rough — неровность граней (доля радиуса): крупные шары
+// слегка «мятые», как в low-poly деревьях; неровность зависит от положения шара, поэтому одинаковые шары не повторяются
+const ICOS = (() => {
   const t = (1 + Math.sqrt(5)) / 2;
-  let v = [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t], [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]].map((p) => { const l = Math.hypot(...p); return p.map((q) => q / l); });
-  let f = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
-  const sub = (lvl) => {
-    for (let l = 0; l < lvl; l++) {
-      const nf = [], cache = {};
-      const mid = (a, b) => { const k = a < b ? a + '_' + b : b + '_' + a; if (cache[k] !== undefined) return cache[k]; const p = v[a].map((q, i) => (q + v[b][i]) / 2), ln = Math.hypot(...p); v.push(p.map((q) => q / ln)); return (cache[k] = v.length - 1); };
-      for (const [a, b, c] of f) { const ab = mid(a, b), bc = mid(b, c), ca = mid(c, a); nf.push([a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]); }
-      f = nf;
-    }
+  const v0 = [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t], [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]].map((p) => { const l = Math.hypot(...p); return p.map((q) => q / l); });
+  const f0 = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
+  const sub = (v, f) => {
+    const nf = [], cache = {};
+    const mid = (a, b) => { const k = a < b ? a + '_' + b : b + '_' + a; if (cache[k] !== undefined) return cache[k]; const p = v[a].map((q, i) => (q + v[b][i]) / 2), ln = Math.hypot(...p); v.push(p.map((q) => q / ln)); return (cache[k] = v.length - 1); };
+    for (const [a, b, c] of f) { const ab = mid(a, b), bc = mid(b, c), ca = mid(c, a); nf.push([a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]); }
+    return nf;
   };
-  sub(1);
-  return { v, f };
+  const v1 = v0.map((p) => p.slice());
+  return [{ v: v0, f: f0 }, { v: v1, f: sub(v1, f0) }];
 })();
+const ICO = ICOS[1];
+const hash3 = (x, y, z) => { const h = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return h - Math.floor(h); };
 export function blob(c, cx, cy, z, rx, ry, col, o = {}) {
   [cx, cy] = swp(cx, cy);
-  const k = K(c, col), b = bufOf(c, k), ctr = c.V(cx, cy, z), R = rx / KX, Ry = R * (ry / rx) * 1.15, { v, f } = ICO;
-  const p = (i) => [ctr[0] + v[i][0] * R, ctr[1] + v[i][1] * Ry, ctr[2] + v[i][2] * R];
+  const opt = typeof o === 'object' ? o : {};
+  const k = K(c, col), b = bufOf(c, k), ctr = c.V(cx, cy, z), R = rx / KX, Ry = R * (ry / rx) * 1.15, { v, f } = ICOS[opt.detail ?? 1];
+  const rough = opt.rough ?? (rx >= 7 ? .13 : 0), seed = cx * 3.7 + cy * 5.3 + z * .31;
+  const sc = rough ? v.map((q, i) => 1 + (hash3(i * 1.3, seed, q[1] * 9) - .5) * 2 * rough) : null;
+  const p = (i) => { const m = sc ? sc[i] : 1; return [ctr[0] + v[i][0] * R * m, ctr[1] + v[i][1] * Ry * m, ctr[2] + v[i][2] * R * m]; };
   for (const [a, bb, cc] of f) { const A = p(a), B = p(bb), C = p(cc); b.tri(...A, ...B, ...C, k); }
+}
+// Усечённый конус-«этаж» (ёлки, пагоды): r0 — радиус снизу, r1 — сверху (в клетках), n граней, rot — поворот
+export function frustum(c, cx, cy, z, r0, r1, h, col, o = {}) {
+  [cx, cy] = swp(cx, cy);
+  const n = o.n || 7, rot = o.rot || 0, side = K(c, col), top = o.top ? K(c, o.top) : side, b = bufOf(c, side);
+  const ctr = c.V(cx, cy, z), H = hz(h);
+  const P0 = (i, r, y) => { const a = rot + i / n * 6.2832; return [ctr[0] + Math.cos(a) * r, ctr[1] + y, ctr[2] + Math.sin(a) * r]; };
+  for (let i = 0; i < n; i++) {
+    const a0 = P0(i, r0, 0), a1 = P0(i + 1, r0, 0), t0 = P0(i, r1, H), t1 = P0(i + 1, r1, H);
+    b.quad(a1, a0, t0, t1, side);
+    const tc = bufOf(c, top), ap = [ctr[0], ctr[1] + H, ctr[2]];
+    tc.tri(ap[0], ap[1], ap[2], t1[0], t1[1], t1[2], t0[0], t0[1], t0[2], top);
+    b.tri(a0[0], a0[1], a0[2], a1[0], a1[1], a1[2], ctr[0], ctr[1], ctr[2], side);
+  }
+}
+// Изогнутый лист (трава, папоротник): растёт из точки в направлении ang, длина len и ширина w в клетках, высота H в пикселях
+export function leaf(c, x, y, z, ang, len, w, col, H = 18) {
+  [x, y] = swp(x, y);
+  const k = K(c, col), b = bufOf(c, k), ca = Math.cos(ang), sa = Math.sin(ang), n = 3;
+  const pt = (t, side) => {
+    const ww = w * Math.pow(1 - t, .65) * (side / 2), hh = H * (1.7 * t - 1.0 * t * t);
+    return c.V(x + ca * len * t - sa * ww, y + sa * len * t + ca * ww, z + hh);
+  };
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n, t1 = (i + 1) / n;
+    b.quad(pt(t0, -1), pt(t1, -1), pt(t1, 1), pt(t0, 1), k);
+  }
 }
 export function ball(c, cx, cy, z, r, col) { blob(c, cx, cy, z, r, r, col); }
 
