@@ -18,7 +18,7 @@ import { buildHUD, updateHUD, setSpeed } from './ui/hud.js';
 import { buildBar, renderBar, updateCards } from './ui/buildbar.js';
 import { initPanel, updatePanel, clearSelection } from './ui/panel.js';
 import { openIntro } from './ui/modals.js';
-import { chooseStorage, resolveSave, watchConflicts } from './ui/cloud.js';
+import { chooseStorage, resolveSave, watchConflicts, activateCloud } from './ui/cloud.js';
 import { toast } from './ui/ui.js';
 import { initInput, updateInput } from './input.js';
 import { UI } from './ui/state.js';
@@ -41,7 +41,7 @@ function frame(ts) {
   if (el < 12) { requestAnimationFrame(frame); return; }      // не больше ~60 кадров/с на 120–144 Гц экранах
   const rdt = Math.min(0.1, el / 1000); last = ts;
   // на паузе замираем всё анимированное: дождь, птицы, вода, дым, покачивание (сон считается ходом времени)
-  const paused = !G.speed && !G.player.sleeping, dt = paused ? 0 : rdt; time += dt;
+  const paused = G.frozen || (!G.speed && !G.player.sleeping), dt = paused ? 0 : rdt; time += dt;
   // адаптивное разрешение: если кадры дольше ~24 мс — снижаем плотность пикселей, при запасе возвращаем
   if (el < 250) {
     ivEma = ivEma * 0.95 + el * 0.05;
@@ -52,7 +52,7 @@ function frame(ts) {
   try {
     let t0 = now();
     updateInput(rdt); t0 = mark('input', t0);
-    simulate(rdt); t0 = mark('sim', t0);
+    if (!G.frozen) simulate(rdt); t0 = mark('sim', t0);
     fx.update(dt, rdt);
     if (G.scene === 'world') fx.ambient(dt, time, G.weather.type);
     t0 = mark('fx', t0);
@@ -85,7 +85,7 @@ async function boot() {
   setInterval(() => save(), 30000);
   addEventListener('beforeunload', () => { save(); cloud.flush(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) { save(); cloud.flush(); } });
-  watchConflicts();
+  watchConflicts(); activateCloud();
   if (src.offline) toast('Нет связи с облаком — играем с сохранения на устройстве, позже отправим');
   if (src.push) { save(); cloud.flush(); }
   // новая игра = чистый первый запуск: стираем сохранение и перезагружаем страницу (?fresh=1) — дальше всё как при первом открытии, с приветственным окном и паузой

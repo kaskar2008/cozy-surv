@@ -62,10 +62,10 @@ export function chooseStorage(done) {
     h('p', { class: 'muted' }, 'Потом можно переключиться в меню (⚙️).')), STICKY);
   const afterLogin = async () => {
     let r; try { r = await cloud.fetchSave(); } catch (e) { failModal(e, pick); return; }
-    if (!r) { setMode('cloud'); closeModal(); done(); return; }
+    if (!r) { setMode('cloud'); activateCloud(); closeModal(); done(); return; }
     const found = () => openModal('☁️ В облаке уже есть игра', h('div', { class: 'menu' }, h('p', null, info(r)),
       h('button', { class: 'primary', onclick: () => takeRemote(r) }, '▶ Продолжить эту игру'),
-      h('button', { class: 'danger', onclick: () => confirmStep('🌱 Начать заново?', 'Старая игра в облаке будет заменена новой, когда ты начнёшь жить.', 'Заменить новой игрой', () => { setMode('cloud'); closeModal(); done(); }, found) }, '🌱 Начать новую'),
+      h('button', { class: 'danger', onclick: () => confirmStep('🌱 Начать заново?', 'Старая игра в облаке будет заменена новой, когда ты начнёшь жить.', 'Заменить новой игрой', () => { setMode('cloud'); activateCloud(); closeModal(); done(); }, found) }, '🌱 Начать новую'),
       h('button', { onclick: pick }, '← Назад')), STICKY);
     found();
   };
@@ -123,7 +123,7 @@ function disable() {
   }, again);
 }
 function migrate() {
-  const enable = () => { setMode('cloud'); save(); cloud.flush(); closeModal(); toast('Игра сохранена в облаке ☁️'); };
+  const enable = () => { setMode('cloud'); activateCloud(); save(); cloud.flush(); closeModal(); toast('Игра сохранена в облаке ☁️'); };
   openAuth({
     title: '☁️ Вход в облако', onBack: () => closeModal(),
     onSuccess: async () => {
@@ -139,8 +139,25 @@ function migrate() {
   });
 }
 
+// ---------- игра открыта на другом устройстве ----------
+// Занять сессию: остальные устройства этого аккаунта замрут.
+export function activateCloud() { if (getMode() === 'cloud') cloud.startSession().catch(() => { }); }
+function freezeHere() {
+  G.frozen = true; G.noSave = true;
+  const body = h('div', { class: 'menu' },
+    h('p', null, 'Ты вошёл в игру с другого устройства, поэтому здесь она приостановлена: так сохранения не перепутаются.'),
+    h('p', { class: 'muted' }, 'Нажми «Продолжить здесь» — игра подтянется из облака и пойдёт на этом устройстве, а на остальных замрёт.'));
+  const go = h('button', { class: 'primary', onclick: async () => {
+    go.disabled = true; go.textContent = 'Загружаю…';
+    try { const r = await cloud.fetchSave(); if (r) takeRemote(r); else reloadClean(); } catch (e) { toast(cloud.errText(e)); go.disabled = false; go.textContent = '▶ Продолжить здесь'; }
+  } }, '▶ Продолжить здесь');
+  body.append(go);
+  openModal('🔒 Игра открыта на другом устройстве', body, STICKY);
+}
+
 // ---------- конфликт: игру сохранили с другого устройства ----------
 export function watchConflicts() {
+  cloud.onFrozen(freezeHere);
   cloud.onConflict((c) => openModal('⚠️ Игра изменилась на другом устройстве', h('div', { class: 'menu' },
     h('p', null, `В облаке более свежая игра: ${info(c)}. Что оставить?`),
     h('button', { class: 'primary', onclick: async () => { try { const r = await cloud.resolveConflict(false); if (r) takeRemote(r); else closeModal(); } catch (e) { toast(cloud.errText(e)); } } }, '⬇️ Загрузить облачную игру'),

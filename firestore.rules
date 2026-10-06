@@ -8,5 +8,9 @@ service cloud.firestore {
         && request.resource.data.blob is string && request.resource.data.blob.size() < 1000000;
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
+    // Какое устройство сейчас «главное» (см. cloud.js): маленький документ с id вкладки.
+    match /users/{uid}/meta/session {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
   }
 }

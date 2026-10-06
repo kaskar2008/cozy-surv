@@ -167,6 +167,7 @@ export function rotateGhost() { UI.rot ^= 1; ghostKey = ''; updateGhost(true); }
 
 function onKey(e) {
   if (e.target && /input|textarea/i.test(e.target.tagName)) return;
+  if (G.frozen) return;   // игра приостановлена: открыта на другом устройстве
   const k = e.key.toLowerCase();
   if (k === 'escape') { if (UI.modal) closeModal(); else if (UI.tool !== 'select') cancelBuild(); else if (UI.sel) clearSelection(); else openMenu(); return; }
   if (UI.modal) return;
