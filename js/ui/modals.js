@@ -186,11 +186,21 @@ export function openJournal(tab = 'goals', focus) {
   const el = focus && content.querySelector(`[data-id="${focus}"]`);
   if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1800); }
 }
+const root = document.documentElement;
+const canFullscreen = !!(root.requestFullscreen || root.webkitRequestFullscreen);
+const isFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+function toggleFullscreen() {
+  const p = isFullscreen()
+    ? (document.exitFullscreen || document.webkitExitFullscreen).call(document)
+    : (root.requestFullscreen || root.webkitRequestFullscreen).call(root);
+  p && p.catch && p.catch(() => toast('Не удалось открыть полный экран'));
+}
 export function openMenu() {
   const body = h('div', { class: 'menu' },
     h('button', { class: 'primary', onclick: () => closeModal() }, '▶ Продолжить'),
     h('button', { onclick: () => { save(); toast('Игра сохранена 💾'); } }, '💾 Сохранить сейчас'),
     h('button', { onclick: () => { initAudio(); setMuted(!isMuted()); closeModal(); } }, isMuted() ? '🔊 Включить звук' : '🔇 Выключить звук'),
+    canFullscreen && h('button', { onclick: () => { closeModal(); toggleFullscreen(); } }, isFullscreen() ? '🗗 Выйти из полного экрана' : '⛶ Во весь экран'),
     h('button', { onclick: () => { closeModal(); openJournal('help'); } }, '❓ Управление и подсказки'),
     h('button', { class: 'danger', onclick: () => askConfirm('🌱 Новая игра', 'Текущий остров будет удалён, и всё начнётся с самого начала.', 'Начать заново', () => S.hooks.newGame && S.hooks.newGame()) }, '🌱 Новая игра'),
     h('p', { class: 'muted' }, `День ${day() + 1} · автосохранение каждые 30 секунд`));
