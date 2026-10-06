@@ -137,6 +137,12 @@ function drawSandpile(c, n) {
   if (n.st === 'empty') { plane(c, 0, (g) => { g.fillStyle = 'rgba(0,0,0,.05)'; g.beginPath(); g.ellipse(.5, .5, .2, .14, .4, 0, 7); g.fill(); }); return; }
   shadow(c, .5, .5, .3, .1); blob(c, .5, .5, 4, 15, 8, '#e8d49c', { lo: '#cdb87c' }); blob(c, .44, .44, 7, 8, 5, '#f2e2b0');
 }
+function drawPoop(c) {
+  shadow(c, .5, .5, .18, .12);
+  blob(c, .5, .5, 2, 7, 4.5, '#6b4527', { lo: '#4e311c' }); blob(c, .5, .5, 6, 5, 3.4, '#7a5030'); blob(c, .5, .5, 9.5, 3, 2.2, '#8a5d38');
+  c.strokeStyle = 'rgba(190,200,120,.55)'; c.lineWidth = 1; c.lineCap = 'round';   // «запах»
+  for (const dx of [-3, 3]) { const [x, y] = P(.5, .5, 14); c.beginPath(); c.moveTo(x + dx, y); c.quadraticCurveTo(x + dx + 2, y - 3, x + dx, y - 6); c.stroke(); }
+}
 const give = (o) => o;
 export const NDEF = {
   tree: { name: 'Дерево', block: true, h: 100, key: (n, o) => `${n.st}|${o.season}|${n.v % 15}`, draw: (c, n, o) => drawTree(c, n, o, ['oak', 'pine', 'birch'][n.v % 3]),
@@ -169,6 +175,8 @@ export const NDEF = {
     gather: () => ({ verb: 'Подобрать ракушку', time: 1, fx: 'pick', give: { shell: [1, 1] }, after: 'remove' }) },
   sandpile: { name: 'Песчаная куча', block: false, h: 24, key: (n) => n.st, draw: drawSandpile,
     gather: (n) => n.st === 'full' ? { verb: 'Копать песок', time: 2.4, fx: 'chop', give: { sand: [2, 3] }, after: 'empty', regrow: 160 } : null },
+  poop: { name: 'Какашки', block: false, h: 22, key: () => 'p', draw: drawPoop,
+    gather: () => ({ verb: 'Убираю', time: 1.1, fx: 'pick', give: {}, after: 'remove' }) },
   scrap: { name: 'Старые обломки', block: true, h: 40, key: () => 'x', draw: drawScrap,
     gather: () => ({ verb: 'Разбирать обломки', time: 3.5, fx: 'chop', give: { scrap: [2, 4] }, bonus: { nails: [0.4, 1, 3], cloth: [0.25, 1, 1] }, after: 'remove' }) },
 };

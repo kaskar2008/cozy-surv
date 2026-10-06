@@ -10,6 +10,7 @@ const replacer = (k, v) => (k.startsWith('_') || SKIP.has(k) ? undefined : v);
 
 export function hasSave() { try { return !!localStorage.getItem(KEY); } catch (e) { return false; } }
 export function save() {
+  if (G.noSave) return false;   // пока открыто приветственное окно, новая игра не сохраняется: перезагрузка снова покажет его
   try {
     const data = {
       ver: 1, dayLen: DAY, seed: G.seed, t: G.t, inv: G.inv, needs: G.needs, buffs: G.buffs, weather: G.weather, wx: G.wx, sky: { rainbow: G.sky.rainbow, aurora: G.sky.aurora, star: null },

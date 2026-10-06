@@ -2,7 +2,8 @@
 import { G, N, day, hour, isNight, season } from './state.js';
 import { BDEF } from '../data/buildings/index.js';
 import { FDEF } from '../data/furniture.js';
-import { walkable, flood, pathFrom, T, inB } from './world.js';
+import { walkable, flood, pathFrom, T, inB, ti, addNode } from './world.js';
+import { petWord } from '../data/pets.js';
 import { S, toast, stat, addBuff } from './api.js';
 import { isHot } from './nets.js';
 import * as eco from './eco.js';
@@ -16,12 +17,12 @@ import { goTo } from './player.js';
 const COLS = { cat: ['#e8a05a', '#c9c9d0', '#4a4a52', '#f0e0c8'], dog: ['#c9915f', '#8a6a4a', '#e8d8b8'] };
 export function updatePets(dt) {
   for (const b of G.bMap.values()) {
-    const d = BDEF[b.t]; if (!d.pet) continue;
+    const d = BDEF[b.t]; if (!d.pet || b.bld) continue;
     if (!G.pets.some((p) => p.home === b.id)) {
       b.st.petT = (b.st.petT || 0) + dt;
       if (b.st.petT > 80 && G.cozy.total >= 6) {
-        const x = b.x + .5, y = b.y + b.d + .6;
-        G.pets.push({ kind: d.pet, home: b.id, x, y, face: 1, moving: false, sleep: false, t: 2, love: 0, col: pick(COLS[d.pet]) });
+        const sp = nearOk(b.x + .5, b.y + b.d + .6) || [b.x + .5, b.y + b.d + .6], x = sp[0], y = sp[1];
+        G.pets.push({ kind: d.pet, home: b.id, x, y, face: 1, moving: false, sleep: false, t: 2, love: 0, bond: 40, hunger: 70, poopT: rnd(70, 140), col: pick(COLS[d.pet]) });
         toast(d.pet === 'cat' ? 'В кошкином доме кто-то поселился! 🐈 Погладь его (нажми на кота)' : 'У будки появился пёс! 🐕 Погладь его', 'goal'); sfx(d.pet === 'cat' ? 'meow' : 'woof');
         fx.hearts(x, y, 20);
       }
@@ -30,35 +31,107 @@ export function updatePets(dt) {
   for (const pet of G.pets) {
     const hb = G.bMap.get(pet.home); if (!hb) continue;
     pet.moving = false;
-    // ночь в доме у лежанки
-    if (pet.kind === 'cat' && isNight()) {
-      const bed = findCatBed();
-      if (bed) { pet.in = bed.home.id; pet.x = bed.it.x + .5; pet.y = bed.it.y + .6; pet.sleep = true; continue; }
-    } else if (pet.in) { pet.in = null; pet.x = hb.x + .5; pet.y = hb.y + hb.d + .6; pet.sleep = false; }
-    pet.t -= dt;
-    if (pet.t <= 0) {
+    // старые сохранения: новые поля
+    pet.hunger ??= 70; pet.bond ??= Math.min(100, 30 + (pet.love || 0) * 3); pet.poopT ??= rnd(70, 140);
+    pet.hunger = Math.max(0, pet.hunger - dt * (pet.sleep ? .08 : .16));       // от «сыт» до «голоден» ~10 минут
+    if (pet.ask > 0) pet.ask -= dt;
+    if (!pet.in && !petOk(Math.floor(pet.x), Math.floor(pet.y))) { const q = nearOk(hb.x + .5, hb.y + hb.d + .6) || nearOk(pet.x, pet.y); if (q) { pet.x = q[0]; pet.y = q[1]; pet.tx = null; } }   // постройку поставили поверх — выводим
+    // долго не кормили — идёт добывать еду сам (и немного обижается)
+    if (pet.hunger <= 0 && !pet.in && !pet.job) { pet.starve = (pet.starve || 0) + dt; if (pet.starve > 40) startForage(pet, hb); } else if (pet.hunger > 0) pet.starve = 0;
+    // ночью питомцы идут в свой домик (кошкин дом / будка) спать, утром выходят
+    const night = isNight();
+    if (pet.in) {
+      if (night && pet.in === 'house') { pet.sleep = true; hb.st.sleeping = true; continue; }
+      pet.in = null; hb.st.sleeping = false; pet.sleep = false; pet.t = rnd(2, 6);
+      const q = nearOk(hb.x + .5, hb.y + hb.d + .6); if (q) { pet.x = q[0]; pet.y = q[1]; }
+    }
+    if (night && !pet.job) { pet.job = 'bed'; pet.jr = 0; pet.sleep = false; pet.ask = 0; setTarget(pet, hb.x + .5, hb.y + hb.d + .6); }
+    // голоса: собаки лают, кошки мяукают
+    if (!pet.sleep && !pet.job && G.scene === 'world') {
+      pet.voiceT = (pet.voiceT ?? rnd(20, 60)) - dt;
+      if (pet.voiceT <= 0) {
+        pet.voiceT = rnd(45, 120);
+        if (Math.hypot(G.player.x - pet.x, G.player.y - pet.y) < 22) { sfx(pet.kind === 'cat' ? 'meow' : 'woof'); fx.floatText(pet.x, pet.y, pet.kind === 'cat' ? 'Мяу' : 'Гав!', '#fff6d0', 30); }
+      }
+    }
+    if (pet.job) petJob(pet, hb, dt);
+    else pet.t -= dt;
+    if (pet.t <= 0 && !pet.job) {
       pet.t = rnd(6, 16); pet.tx = null; pet.sleep = false;
       const r = Math.random();
       const fire = nearestFire(pet.x, pet.y, 12);
       const p = G.player;
       if (isNight() && r < .6) { pet.sleep = true; pet.t = rnd(14, 30); if (fire) setTarget(pet, fire.x + 1.2, fire.y + .6); }
-      else if (r < .22 && G.scene === 'world' && Math.hypot(p.x - pet.x, p.y - pet.y) < 16) setTarget(pet, p.x + rnd(-1.5, 1.5), p.y + rnd(-1.5, 1.5));
+      else if (r < .08 + pet.bond * .003 && G.scene === 'world' && Math.hypot(p.x - pet.x, p.y - pet.y) < 16) { setTarget(pet, p.x + rnd(-1.5, 1.5), p.y + rnd(-1.5, 1.5)); pet.ask = 30; }   // пришёл «за ласкою»; чем теплее отношение, тем чаще
       else if (r < .4 && fire && (G.needs.warmth < 70 || isNight() || season() === 3)) { setTarget(pet, fire.x + rnd(-1.4, 1.4), fire.y + rnd(.6, 1.6)); pet.sleep = chance(.5); }
       else if (r < .75) setTarget(pet, hb.x + .5 + rnd(-5, 5), hb.y + hb.d + rnd(-3, 5));
       else pet.sleep = chance(.4);
     }
+    if (pet.kind === 'dog' && !pet.in && !pet.sleep && !pet.job) { pet.poopT -= dt; if (pet.poopT <= 0) dropPoop(pet); }
     if (pet.tx != null && !pet.sleep) {
       const dx = pet.tx - pet.x, dy = pet.ty - pet.y, dd = Math.hypot(dx, dy), sp = (pet.kind === 'cat' ? 1.7 : 2.3) * dt;
       if (dd < .12) pet.tx = null;
       else {
         const nx = pet.x + dx / dd * sp, ny = pet.y + dy / dd * sp;
-        if (walkable(Math.floor(nx), Math.floor(ny))) { pet.x = nx; pet.y = ny; pet.moving = true; const sx = dx - dy; if (Math.abs(sx) > .05) pet.face = sx > 0 ? 1 : -1; }
+        if (petOk(Math.floor(nx), Math.floor(ny))) { pet.x = nx; pet.y = ny; pet.moving = true; const sx = dx - dy; if (Math.abs(sx) > .05) pet.face = sx > 0 ? 1 : -1; }
         else { pet.tx = null; }
       }
     }
   }
 }
-function setTarget(pet, x, y) { if (walkable(Math.floor(x), Math.floor(y))) { pet.tx = x; pet.ty = y; } }
+function dropPoop(pet) {
+  const x = Math.floor(pet.x), y = Math.floor(pet.y), k = inB(x, y) ? ti(x, y) : -1;
+  pet.poopT = rnd(120, 260); pet.tx = null; pet.t = Math.max(pet.t, 2.5);        // замирает на минутку
+  if (k < 0 || G.nAt[k] || G.bAt[k] || G.tiles[k] === T.WATER) return;
+  let n = 0; for (const o of G.nodeMap.values()) if (o.t === 'poop') n++;
+  if (n >= 6) return;
+  addNode('poop', x, y, { st: 'full' }); stat('poops');
+}
+function startForage(pet, hb) {
+  for (let i = 0; i < 10; i++) {
+    const a = Math.random() * 6.283, r = rnd(6, 10), x = hb.x + Math.cos(a) * r, y = hb.y + Math.sin(a) * r;
+    if (petOk(Math.floor(x), Math.floor(y))) { pet.job = 'forage'; pet.jt = null; pet.sleep = false; pet.ask = 0; setTarget(pet, x, y); return; }
+  }
+  pet.starve = 20;   // не нашёл куда идти — попробует позже
+}
+function petJob(pet, hb, dt) {
+  if (pet.job === 'bed') {
+    if (!isNight()) { pet.job = null; return; }
+    if (pet.tx == null) {
+      const near = Math.hypot(pet.x - hb.x - .5, pet.y - hb.y - hb.d) < 1.6;
+      if (near || (pet.jr = (pet.jr || 0) + 1) >= 6) { pet.in = 'house'; pet.job = null; pet.sleep = true; hb.st.sleeping = true; pet.jr = 0; }
+      else setTarget(pet, hb.x + .5, hb.y + hb.d + .6);
+    }
+    return;
+  }
+  if (pet.job === 'forage' && pet.tx == null) {
+    if (pet.jt == null) pet.jt = rnd(5, 8);             // роется на месте
+    pet.jt -= dt;
+    if (pet.jt <= 0) {
+      pet.jt = null; pet.job = 'return'; setTarget(pet, hb.x + .5, hb.y + hb.d + .6);
+      pet.hunger = Math.min(100, pet.hunger + 45); pet.bond = Math.max(0, pet.bond - 8); pet.starve = 0;
+      fx.floatText(pet.x, pet.y, '💔', '#ffd0d0', 30);
+      toast(`${petWord(pet)} не дождался еды и нашёл себе что-то сам… Немного обиделся 💔`, 'warn');
+    }
+  } else if (pet.job === 'return' && pet.tx == null) {
+    if (Math.hypot(pet.x - hb.x - .5, pet.y - hb.y - hb.d) > 2.2 && (pet.jr = (pet.jr || 0) + 1) < 6) setTarget(pet, hb.x + .5, hb.y + hb.d + .6);
+    else { pet.job = null; pet.jr = 0; pet.t = rnd(4, 8); }
+  }
+}
+// куда питомцу можно ступать: свободная земля, дорожки, настил, калитка — но не постройки, грядки и стройки
+function petOk(tx, ty) {
+  if (!walkable(tx, ty)) return false;
+  const id = G.bAt[ti(tx, ty)]; if (!id) return true;
+  const b = G.bMap.get(id), d = b && BDEF[b.t];
+  return !!d && !b.bld && !!d.walk && !d.crops;
+}
+// ближайшая допустимая клетка (до 3 клеток вокруг), центр клетки
+function nearOk(x, y) {
+  const cx = Math.floor(x), cy = Math.floor(y); if (petOk(cx, cy)) return [x, y];
+  for (let r = 1; r <= 3; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r && petOk(cx + dx, cy + dy)) return [cx + dx + .5, cy + dy + .5];
+  return null;
+}
+function setTarget(pet, x, y) { const p = nearOk(x, y); if (p) { pet.tx = p[0]; pet.ty = p[1]; } }
 function nearestFire(x, y, r) {
   let best = null, bd = r;
   for (const b of G.bMap.values()) if (BDEF[b.t].warm && isHot(b)) { const d = Math.hypot(b.x + .5 - x, b.y + .5 - y); if (d < bd) { bd = d; best = b; } }

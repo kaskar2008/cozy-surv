@@ -12,7 +12,7 @@ export function neighborsOfRect(x, y, w, d, skipId = 0) {
   const chk = (tx, ty) => {
     if (!inB(tx, ty)) return;
     const id = G.bAt[ti(tx, ty)];
-    if (id && id !== skipId && !seen.has(id)) { seen.add(id); out.push(G.bMap.get(id)); }
+    if (id && id !== skipId && !seen.has(id)) { seen.add(id); const o = G.bMap.get(id); if (o && !o.bld) out.push(o); }   // недостроенное ни с чем не связано
   };
   for (let i = 0; i < w; i++) { chk(x + i, y - 1); chk(x + i, y + d); }
   for (let j = 0; j < d; j++) { chk(x - 1, y + j); chk(x + w, y + j); }
@@ -29,7 +29,7 @@ export function rebuildLinks() {
       let m = 0;
       EDGE.forEach(([dx, dy], i) => {
         const id = inB(b.x + dx, b.y + dy) ? G.bAt[ti(b.x + dx, b.y + dy)] : 0;
-        const o = id && G.bMap.get(id); if (!o) return;
+        const o = id && G.bMap.get(id); if (!o || o.bld) return;
         const od = BDEF[o.t];
         if (def.conduit ? !!(od.net && od.net[def.conduit]) : od.strand === def.strand) m |= 1 << i;
       });
@@ -42,7 +42,7 @@ export function rebuildLinks() {
     const map = G.comp[type], seenAll = new Set();
     for (const b of G.bMap.values()) {
       const nd = BDEF[b.t].net?.[type];
-      if (!nd || seenAll.has(b.id)) continue;
+      if (!nd || b.bld || seenAll.has(b.id)) continue;
       const comp = { nodes: [], type };
       const stack = [b]; seenAll.add(b.id);
       while (stack.length) {
@@ -103,7 +103,7 @@ export function maskFor(def, x, y) {
   let m = 0;
   EDGE.forEach(([dx, dy], i) => {
     const id = inB(x + dx, y + dy) ? G.bAt[ti(x + dx, y + dy)] : 0;
-    const o = id && G.bMap.get(id); if (!o) return;
+    const o = id && G.bMap.get(id); if (!o || o.bld) return;
     const od = BDEF[o.t];
     if (def.conduit ? !!(od.net && od.net[def.conduit]) : od.strand === def.strand) m |= 1 << i;
   });

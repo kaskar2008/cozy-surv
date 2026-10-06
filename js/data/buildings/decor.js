@@ -139,13 +139,13 @@ reg([
   {
     id: 'cat_house', name: 'Кошкин дом', cat: 'decor', icon: '🐈', cost: { wood: 8, cloth: 2 }, req: ['home'], h: 50, cozy: 3,
     desc: 'Маленький домик. Рано или поздно в нём поселится кот, который будет бродить по лагерю, греться у костра и требовать почёсываний.',
-    pet: 'cat',
+    pet: 'cat', badge: (b) => (b.st.sleeping ? '💤' : null),
     draw(c) { shadow(c, .5, .5, .34, .16); box(c, .16, .16, 0, .68, .68, 24, '#d9a066', { tex: 'planks' }); gable(c, .08, .08, 24, .84, .84, 16, .08, '#a5503e', '#d9a066', 'y'); wallRect(c, 'L', .84, .38, .62, 0, 16, '#2a1a10'); blob(c, .5, .5, 3, 8, 3, '#e8c88a'); },
   },
   {
     id: 'dog_house', name: 'Собачья будка', cat: 'decor', icon: '🐕', cost: { planks: 6, wood: 6, cloth: 2 }, req: ['home'], h: 60, cozy: 3,
     desc: 'Будка для верного друга. Пёс будет сопровождать тебя по лагерю.',
-    pet: 'dog',
+    pet: 'dog', badge: (b) => (b.st.sleeping ? '💤' : null),
     draw(c) { shadow(c, .5, .5, .4, .16); box(c, .12, .12, 0, .76, .76, 28, '#6f8fb8', { tex: 'planks' }); gable(c, .04, .04, 28, .92, .92, 20, .08, '#a5503e', '#6f8fb8', 'y'); wallRect(c, 'L', .88, .36, .64, 0, 20, '#1c1612'); },
   },
   // ---------- свет ----------

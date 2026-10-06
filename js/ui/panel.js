@@ -6,6 +6,7 @@ import { BDEF } from '../data/buildings/index.js';
 import { FDEF } from '../data/furniture.js';
 import { ITEMS, itemIcon, itemName } from '../data/items.js';
 import { STATIONS } from '../data/recipes.js';
+import { PET_FOOD, HUNGRY } from '../data/pets.js';
 import { CROPS } from '../data/crops.js';
 import * as eco from '../game/eco.js';
 import * as api from '../game/api.js';
@@ -15,7 +16,7 @@ import { workProgress } from '../game/progress.js';
 import { enterHome, furnActions, removeFurn, proxyOf, homeOf } from '../game/interior.js';
 import { R } from '../render/scene.js';
 import { focusUpper } from '../render/camera.js';
-import { toast } from './ui.js';
+import { toast, askConfirm } from './ui.js';
 import { sfx } from '../core/audio.js';
 
 let root, sigLast = '', acc = 0;
@@ -59,6 +60,12 @@ function bar(label, v, max, col, text) {
 }
 function describeBld(b) {
   const def = BDEF[b.t], st = b.st, lines = [], bars = [], acts = [], extra = [];
+  if (b.bld) {
+    const left = Math.max(0, Math.ceil(b.bld.T * (1 - b.bld.p)));
+    bars.push(bar('Строительство', b.bld.p, 1, '#8ec7f0', `${Math.floor(b.bld.p * 100)}% · ещё ~${left} с`));
+    lines.push('🏗 Постройка возводится — пока она не готова, ничего не работает');
+    return { icon: def.icon, title: bldName(b) + ' (стройка)', desc: def.desc, lines, bars, acts, links: [], refund: { ...def.cost }, demoLabel: '✖ Отменить стройку', demolish: () => { api.demolish(b); UI.sel = null; R.sel = null; R.links = []; sigLast = ''; root.style.display = 'none'; } };
+  }
   const A = (label, run, o = {}) => acts.push({ label, run, ...o });
   const home = def.home;
   if (def.burner) {
@@ -141,9 +148,23 @@ function describeBld(b) {
   if (def.music) A(st.on ? '⏹ Выключить' : '▶ Включить музыку', () => api.toggleMusic(b));
   if (def.mill) { lines.push(st.on ? '⚙ Мелет зерно' : st.off ? 'Остановлена' : 'Ждёт пшеницу (нужно 3 🌾 в запасах)'); A(st.off ? '▶ Запустить' : '⏹ Остановить', () => { st.off = !st.off; }); }
   if (def.mailbox) { lines.push(st.letter ? '✉️ Пришло письмо!' : 'Писем пока нет'); if (st.letter) A('✉️ Прочитать письмо', () => api.readLetter(b), { primary: true }); }
-  if (def.pet) { const p = G.pets.find((x) => x.home === b.id); lines.push(p ? (p.kind === 'cat' ? '🐈 Здесь живёт кот' : '🐕 Здесь живёт пёс') : 'Пока пусто… подожди немного'); }
+  if (def.pet) {
+    const p = G.pets.find((x) => x.home === b.id);
+    if (!p) lines.push('Пока пусто… подожди немного');
+    else {
+      const hunger = p.hunger ?? 70, food = api.petFoodHave(p);
+      lines.push(p.kind === 'cat' ? '🐈 Здесь живёт кот' : '🐕 Здесь живёт пёс');
+      bars.push(bar('Сытость', hunger, 100, '#e6a44a', hunger < HUNGRY ? 'голоден!' : ''));
+      bars.push(bar('Привязанность', p.bond ?? 40, 100, '#e87aa8', ''));
+      for (const k of food) A(`${itemIcon(k)} Покормить: ${itemName(k)} (${eco.count(k)})`, () => api.feedPet(p, k), { off: hunger > 92 });
+      A('🤲 Погладить', () => api.petPet(p), { primary: !food.length || hunger >= HUNGRY });
+      if (!food.length) lines.push('💡 Корм: ' + Object.keys(PET_FOOD[p.kind]).map(itemName).join(', '));
+      if (p.kind === 'dog') lines.push('💩 Пёс гуляет и иногда оставляет «подарки» — убери их, а компостная куча примет их сама');
+      if (p.job) lines.push(p.job === 'forage' ? '🔎 Ушёл искать еду сам…' : '🏃 Возвращается домой');
+    }
+  }
   if (def.id === 'snowman') lines.push('Растает с приходом весны ☃️');
-  return { icon: def.icon, title: bldName(b), desc: def.desc, lines, bars, acts, station: def.station ? { holder: b, key: def.station } : null, links: linksOf(b), refund: refundOf(b), demolish: () => { if (def.home && !confirm('Снести дом вместе с мебелью? Вернётся 60% материалов.')) return; api.demolish(b); UI.sel = null; R.sel = null; R.links = []; sigLast = ''; root.style.display = 'none'; } };
+  return { icon: def.icon, title: bldName(b), desc: def.desc, lines, bars, acts, station: def.station ? { holder: b, key: def.station } : null, links: linksOf(b), refund: refundOf(b), demolish: () => { const go = () => { api.demolish(b); UI.sel = null; R.sel = null; R.links = []; sigLast = ''; root.style.display = 'none'; }; if (def.home) askConfirm('🗑 Снести дом?', 'Дом снесётся вместе с мебелью. Вернётся 60% материалов.', 'Снести', go); else go(); } };
 }
 function describeWater(sel) {
   const acts = [];

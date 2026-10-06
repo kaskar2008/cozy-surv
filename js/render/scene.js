@@ -14,6 +14,7 @@ import { drawLighting } from './lighting.js';
 import { drawWeather } from './weather.js';
 import { isHot } from '../game/nets.js';
 import { workProgress } from '../game/progress.js';
+import { drawConstruction } from './construct.js';
 import { mark, now as pnow } from '../core/prof.js';
 
 // Состояние отрисовки, которое задают ввод и UI
@@ -31,11 +32,12 @@ function drawBld(c, b, def, o, t) {
     const age = now() - b.pop;
     if (age < 0.5) { const k = easeOutBack(Math.min(1, age / 0.45)), cx = (b.x + b.w / 2 - b.y - b.d / 2) * HW, cy = (b.x + b.w / 2 + b.y + b.d / 2) * HH; c.translate(cx, cy); c.scale(.8 + .2 * k, Math.max(.05, k)); c.translate(-cx, -cy); c.globalAlpha = Math.min(1, age * 4); } else delete b.pop;
   }
-  if (def.draw && !def.terraform) {
+  if (b.bld) drawConstruction(c, b, def, def.draw && !def.terraform ? bldSprite(b, def, o) : null, sx, sy, t);
+  else if (def.draw && !def.terraform) {
     const s = bldSprite(b, def, o);
     drawSprite(c, s, sx, sy);
   }
-  if (def.anim) { c.save(); c.translate(sx, sy); setSwap(!!b.rot); def.anim(c, b, t, o); setSwap(false); c.restore(); }
+  if (def.anim && !b.bld) { c.save(); c.translate(sx, sy); setSwap(!!b.rot); def.anim(c, b, t, o); setSwap(false); c.restore(); }
   c.restore();
 }
 function drawNodeSprite(c, n, def, o, t) {
@@ -65,8 +67,8 @@ export function renderWorld(ctx, t, dt) {
     const def = BDEF[b.t];
     if (def.flat) flats.push(b);
     else items.push({ k: b.x + b.w / 2 + b.y + b.d / 2 + (b.y + b.d) * 0.001, b, def });
-    if (def.light && lightOn(b, def, o)) lights.push({ x: b.x + b.w / 2, y: b.y + b.d / 2, z: 24, r: def.light.r, col: def.light.col, f: def.light.flick ? 1 + Math.sin(t * 9 + b.id) * .025 * def.light.flick + Math.sin(t * 23 + b.id * 3) * .015 : 1 });
-    else if (def.home && b.st.glow && o.dusk) lights.push({ x: b.x + b.w / 2, y: b.y + b.d / 2, z: 20, r: 2.2 + b.w * .5, col: '#ffcf80', a: .8 });
+    if (def.light && !b.bld && lightOn(b, def, o)) lights.push({ x: b.x + b.w / 2, y: b.y + b.d / 2, z: 24, r: def.light.r, col: def.light.col, f: def.light.flick ? 1 + Math.sin(t * 9 + b.id) * .025 * def.light.flick + Math.sin(t * 23 + b.id * 3) * .015 : 1 });
+    else if (def.home && !b.bld && b.st.glow && o.dusk) lights.push({ x: b.x + b.w / 2, y: b.y + b.d / 2, z: 20, r: 2.2 + b.w * .5, col: '#ffcf80', a: .8 });
   }
   for (const n of G.nodeMap.values()) {
     if (n.x < view.x0 || n.x > view.x1 || n.y < view.y0 || n.y > view.y1) continue;
@@ -183,7 +185,7 @@ function drawOverlays(c, o, t) {
       c.fillStyle = 'rgba(60,40,25,.55)'; c.beginPath(); c.roundRect(X - w / 2 - 1.5, Y - hh / 2 - 1.5, w + 3, hh + 3, 4); c.fill();
       c.fillStyle = pr.paused ? '#a09888' : pr.col; c.beginPath(); c.roundRect(X - w / 2, Y - hh / 2, Math.max(hh, w * pr.p), hh, 3); c.fill();
     }
-    if (!def.badge) continue;
+    if (!def.badge || b.bld) continue;
     const ic = def.badge(b); if (!ic) continue;
     const [X, Y] = proj(b.x + b.w / 2, b.y + b.d / 2, Math.min(def.h, 70) + 16 + Math.sin(t * 3 + b.id) * 2.5);
     c.fillStyle = 'rgba(255,250,240,.92)'; c.beginPath(); c.arc(X, Y - 4, 11, 0, 7); c.fill(); c.strokeStyle = 'rgba(120,90,60,.35)'; c.lineWidth = 1; c.stroke();

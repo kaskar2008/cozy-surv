@@ -79,9 +79,10 @@ function boot() {
   setInterval(() => save(), 30000);
   addEventListener('beforeunload', () => save());
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
-  S.hooks.newGame = () => { wipe(); newGame(); ensureLinks(); computeCozy(); centerOn(G.player.x, G.player.y); clearSelection(); UI.tool = 'select'; UI.def = null; UI.fdef = null; renderBar(); setSpeed(1); save(); };
+  // новая игра = чистый первый запуск: стираем сохранение и перезагружаем страницу (?fresh=1) — дальше всё как при первом открытии, с приветственным окном и паузой
+  S.hooks.newGame = () => { wipe(); location.replace(location.pathname + '?fresh=1'); };
   S.hooks.onSceneChange = () => { clearSelection(); UI.tool = 'select'; UI.def = null; UI.fdef = null; R.ghost = null; renderBar(); };
-  if (fresh) { setSpeed(0); openIntro(() => { setSpeed(1); save(); }); }
+  if (fresh) { G.noSave = true; setSpeed(0); openIntro(() => { delete G.noSave; setSpeed(1); save(); }); }
   window.cozy = { quality: () => quality, G, S, api, BDEF, cam, R, UI, save, load, prof, syncProf: (on) => { hooks.sync = on ? () => ctx.getImageData(0, 0, 1, 1) : null; } };
   requestAnimationFrame(frame);
 }

@@ -5,7 +5,7 @@ import * as eco from './eco.js';
 import { netOf, netAdd, netTake, isHot, heated, ensureLinks } from './nets.js';
 import { updatePlayer } from './player.js';
 import { COMPOST_T, MILL_T } from './progress.js';
-import { compostsNear, S, toast, stat, stationHeatOk, canCraft, flowersNear, addBuff, buffSum, wakeUp, nearHeat } from './api.js';
+import { compostsNear, finishBuild, S, toast, stat, stationHeatOk, canCraft, flowersNear, addBuff, buffSum, wakeUp, nearHeat } from './api.js';
 import { BDEF } from '../data/buildings/index.js';
 import { STATIONS } from '../data/recipes.js';
 import { CROPS, growMult, SEASONS } from '../data/crops.js';
@@ -142,7 +142,7 @@ function netsStep(dt) {
   seen.clear();
   for (const b of G.bMap.values()) {
     const def = BDEF[b.t], nd = def.net?.water;
-    if (!nd) continue;
+    if (!nd || b.bld) continue;
     let prod = nd.prod || 0;
     if (nd.rain && G.weather.type === 'rain') prod += nd.rain * G.wx.rain;
     if (nd.needsPower && !b.st.powered) prod = 0;
@@ -157,6 +157,7 @@ function buildingsStep(dt) {
   fx.fxs.scope = 'world';
   for (const b of G.bMap.values()) {
     const def = BDEF[b.t], st = b.st;
+    if (b.bld) { updateBuild(b, dt); continue; }
     if (def.burner) updateBurner(b, def, dt);
     if (def.station) updateStation(b, def, dt);
     if (def.crops) updateCrops(b, def, dt);
@@ -165,6 +166,12 @@ function buildingsStep(dt) {
     if (def.music && st.on && (def.net?.power ? st.powered : true)) { const dd = Math.hypot(G.player.x - (b.x + .5), G.player.y - (b.y + .5)); if (G.scene === 'world' && dd <= def.music.r) G.musicNear = true; if (Math.random() < dt * .5) fx.note(b.x + .5, b.y + .5, 30); }
   }
   fx.fxs.scope = null;
+}
+function updateBuild(b, dt) {
+  const bl = b.bld; bl.p += dt / Math.max(.2, bl.T);
+  bl._d = (bl._d || 0) - dt;   // пыль и искры, пока идёт работа
+  if (bl._d <= 0) { bl._d = .35 + Math.random() * .3; const x = b.x + Math.random() * b.w, y = b.y + Math.random() * b.d; fx.dust(x, y, 2); if (Math.random() < .5) fx.spark(x, y, 10 + bl.p * 30); }
+  if (bl.p >= 1) finishBuild(b);
 }
 function updateBurner(b, def, dt) {
   const st = b.st, mx = def.burner.max;
@@ -277,7 +284,7 @@ function onNewDay() {
   const d = day();
   stat('days');
   toast(`День ${d + 1} · ${SEASONS[season()]}`);
-  for (const b of G.bMap.values()) if (BDEF[b.t].mailbox && !b.st.letter && chance(.5)) b.st.letter = Math.floor(Math.random() * 1000);
+  for (const b of G.bMap.values()) if (BDEF[b.t].mailbox && !b.bld && !b.st.letter && chance(.5)) b.st.letter = Math.floor(Math.random() * 1000);
   if (season() === 2) for (const n of G.nodeMap.values()) if (n.t === 'appletree' && n.st === 'full' && !n.fruit && chance(.8)) n.fruit = true;
   const rainy = G.weather.type === 'rain';
   if (countNodes('mushroom') < 18 && (rainy || season() === 2 || chance(.3))) spawnOn('mushroom', (t) => t === T.FOREST, rndi(1, 3));

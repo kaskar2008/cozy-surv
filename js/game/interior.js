@@ -41,6 +41,7 @@ export function rebuildInterior(b) {
 }
 export function enterHome(b) {
   if (G.scene !== 'world') return;
+  if (b.bld) { toast('Дом ещё строится', 'warn'); return; }
   pl.cancelAll();
   G.outCam = { x: cam.x, y: cam.y, zoom: cam.zoom }; G.outPos = { x: G.player.x, y: G.player.y };
   G.scene = b.id; rebuildInterior(b);

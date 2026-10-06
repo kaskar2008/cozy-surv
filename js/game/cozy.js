@@ -47,7 +47,7 @@ export const ALL_SYN = [...OUT_SYN.map((s) => ({ ...s, where: 'out' })), ...IN_S
 
 export function computeCozy() {
   const list = []; let out = 0, inn = 0;
-  const bs = [...G.bMap.values()], cnt = {};
+  const bs = [...G.bMap.values()].filter((b) => !b.bld), cnt = {};
   for (const b of bs) { const d = BDEF[b.t]; if (!d.cozy) continue; cnt[b.t] = (cnt[b.t] || 0) + 1; out += d.cozy * (cnt[b.t] <= 3 ? 1 : .35); }
   out += Math.min(3, G.stats.ponds || 0) * 6;
   for (const s of OUT_SYN) { let ok = false; try { ok = s.test(bs); } catch (e) { } if (ok) { out += s.pts; list.push({ id: s.id, name: s.name, pts: s.pts }); } }

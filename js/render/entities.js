@@ -1,6 +1,7 @@
 // Персонаж, питомцы, путник — рисуются кодом (чиби-стиль).
 import { proj } from '../core/iso.js';
 import { shade } from '../core/util.js';
+import { HUNGRY } from '../data/pets.js';
 
 export const SHIRTS = ['#e8845a', '#5a8fd6', '#6fb86a', '#d66a9a', '#e0b84a', '#8a6ad6'];
 export const HATS = ['Без шапки', 'Бини', 'Соломенная шляпа', 'Кепка', 'Цветочный венок'];
@@ -83,6 +84,14 @@ export function drawTraveler(c, n, t) {
   c.restore();
 }
 
+// пузырёк над питомцем: голоден / пришёл за лаской
+function petBubble(c, pet, t) {
+  const hungry = (pet.hunger ?? 70) < HUNGRY, ic = hungry ? (pet.kind === 'cat' ? '🐟' : '🍖') : pet.ask > 0 ? '💗' : null;
+  if (!ic || pet.job) return;
+  c.save(); c.scale(pet.face || 1, 1); const y = -(pet.sleep ? 26 : 33) + Math.sin(t * 3) * 1.8;
+  c.fillStyle = 'rgba(255,250,240,.94)'; c.strokeStyle = 'rgba(120,90,60,.35)'; c.lineWidth = 1; c.beginPath(); c.arc(0, y, 9, 0, 7); c.fill(); c.stroke();
+  c.font = '11px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#000'; c.fillText(ic, 0, y + 1); c.restore();
+}
 export function drawPet(c, pet, t) {
   const [X, Y] = proj(pet.x, pet.y, 0);
   c.save(); c.translate(X, Y); shadowAt(c, 0, 1, 8);
@@ -91,7 +100,7 @@ export function drawPet(c, pet, t) {
   if (pet.sleep) {
     c.fillStyle = col; c.beginPath(); c.ellipse(0, -5, 10, 6, 0, 0, 7); c.fill(); c.fillStyle = shade(col, -.15); c.beginPath(); c.ellipse(-7, -6, 5, 4, 0, 0, 7); c.fill();
     c.fillStyle = '#fff'; c.font = '600 11px sans-serif'; c.textAlign = 'center'; c.globalAlpha = .6 + .4 * Math.sin(t * 2); c.fillText('z', 6, -16 - (t * 8 % 6)); c.globalAlpha = 1;
-    c.restore(); return;
+    petBubble(c, pet, t); c.restore(); return;
   }
   c.fillStyle = col;
   c.beginPath(); c.ellipse(0, -8 - bob, cat ? 8 : 9, cat ? 5 : 5.4, 0, 0, 7); c.fill();
@@ -100,7 +109,7 @@ export function drawPet(c, pet, t) {
   if (cat) { c.beginPath(); c.moveTo(5, -15 - bob); c.lineTo(6, -20 - bob); c.lineTo(9, -16 - bob); c.moveTo(9, -16 - bob); c.lineTo(12, -20 - bob); c.lineTo(12, -14 - bob); c.fill(); c.strokeStyle = col; c.lineWidth = 2.4; c.lineCap = 'round'; c.beginPath(); c.moveTo(-8, -9); c.quadraticCurveTo(-15, -14 + Math.sin(t * 3) * 3, -12, -20); c.stroke(); }
   else { c.fillStyle = shade(col, -.25); c.beginPath(); c.ellipse(11, -9 - bob, 2.6, 4, .4, 0, 7); c.fill(); c.beginPath(); c.ellipse(5.4, -13 - bob, 2.2, 4, -.3, 0, 7); c.fill(); c.strokeStyle = col; c.lineWidth = 2.6; c.lineCap = 'round'; c.beginPath(); c.moveTo(-9, -10); c.lineTo(-13, -15 + Math.sin(t * 9) * 2); c.stroke(); }
   c.fillStyle = '#2a1e1e'; c.fillRect(9, -13 - bob, 1.4, 1.8); c.fillRect(11.6, -12 - bob, 1.2, 1.5);
-  c.restore();
+  petBubble(c, pet, t); c.restore();
 }
 
 // Индикатор прогресса действия над персонажем

@@ -12,7 +12,7 @@ import { BDEF } from '../data/buildings/index.js';
 import { SHIRTS, HATS } from '../render/entities.js';
 import { WALL_STYLES, FLOOR_STYLES, WALL_NAMES, FLOOR_NAMES } from '../data/furniture.js';
 import { homeOf, setStyle } from '../game/interior.js';
-import { openModal, closeModal, toast } from './ui.js';
+import { openModal, closeModal, toast, askConfirm } from './ui.js';
 import { save, wipe } from '../game/save.js';
 import { isMuted, setMuted, initAudio } from '../core/audio.js';
 import { UI } from './state.js';
@@ -192,7 +192,7 @@ export function openMenu() {
     h('button', { onclick: () => { save(); toast('Игра сохранена 💾'); } }, '💾 Сохранить сейчас'),
     h('button', { onclick: () => { initAudio(); setMuted(!isMuted()); closeModal(); } }, isMuted() ? '🔊 Включить звук' : '🔇 Выключить звук'),
     h('button', { onclick: () => { closeModal(); openJournal('help'); } }, '❓ Управление и подсказки'),
-    h('button', { class: 'danger', onclick: () => { if (confirm('Начать заново? Текущий остров будет удалён.')) { closeModal(); S.hooks.newGame && S.hooks.newGame(); } } }, '🌱 Новая игра'),
+    h('button', { class: 'danger', onclick: () => askConfirm('🌱 Новая игра', 'Текущий остров будет удалён, и всё начнётся с самого начала.', 'Начать заново', () => S.hooks.newGame && S.hooks.newGame()) }, '🌱 Новая игра'),
     h('p', { class: 'muted' }, `День ${day() + 1} · автосохранение каждые 30 секунд`));
   openModal('⚙️ Меню', body, { cls: 'narrow' });
 }

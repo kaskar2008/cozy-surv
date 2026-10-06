@@ -12,6 +12,8 @@ import { CROPS } from '../data/crops.js';
 import * as fx from '../render/fx.js';
 import { rnd, rndi, pick, chance, clamp } from '../core/util.js';
 import { sfx } from '../core/audio.js';
+import { buildTime } from './progress.js';
+import { PET_FOOD, HUNGRY, petWord } from '../data/pets.js';
 
 export const S = { fx, eco, G, toast: () => {}, hooks: {} };
 export const toast = (msg, kind) => S.toastFn && S.toastFn(msg, kind);
@@ -53,7 +55,7 @@ export function lockReason(def) {
 }
 
 // ---------------------------------------------------------------- проверка места
-const SOFT = new Set(['fibergrass', 'herb', 'flowers', 'mushroom', 'sticks', 'shell', 'driftwood', 'rock', 'reeds', 'clay', 'sandpile']);
+const SOFT = new Set(['fibergrass', 'herb', 'flowers', 'mushroom', 'sticks', 'shell', 'driftwood', 'rock', 'reeds', 'clay', 'sandpile', 'poop']);
 export const softNode = (n) => SOFT.has(n.t) || (n.t === 'tree' && n.st === 'stump');
 export function canPlace(def, x, y, rot) {
   const b = makeBld(def, x, y, rot); const bad = new Set(); let reason = '';
@@ -119,18 +121,24 @@ export function place(def, x, y, rot) {
   eco.pay(def.cost);
   const b = chk.b;
   for (let j = 0; j < b.d; j++) for (let i = 0; i < b.w; i++) { const n = nodeAt(x + i, y + j); if (n) removeNode(n); }
-  G.built[def.id] = (G.built[def.id] || 0) + 1; stat('built');
+  if (def.terraform || def.plantNode) { G.built[def.id] = (G.built[def.id] || 0) + 1; stat('built'); }
   if (def.terraform) { terraform(def, x, y, b); fx.dust(x + 1.5, y + 1.5, 14); sfx('place'); stat('ponds'); return b; }
   if (def.plantNode) {
     const nd = addNode(def.plantNode.t, x, y, { st: 'sapling', tm: def.plantNode.tm, v: def.plantNode.t === 'tree' ? Math.floor(Math.random() * 3) + 3 * rndi(0, 7) : rndi(0, 500) });
     fx.dust(x + .5, y + .5, 6); sfx('place'); return nd;
   }
-  addBld(b); b.pop = performance.now() / 1000;
+  addBld(b); b.bld = { p: 0, T: buildTime(def) };      // стройка: постройка заработает, когда прогресс дойдёт до 100%
   fx.dust(x + b.w / 2, y + b.d / 2, 8 + b.w * 2); sfx('place');
   ensureLinks(); nudgeWorldPlayer();
+  return b;
+}
+export function finishBuild(b) {
+  const def = BDEF[b.t]; delete b.bld;
+  G.built[def.id] = (G.built[def.id] || 0) + 1; stat('built');
+  G.dirtyLinks = true; ensureLinks();   // без «появления с нуля»: постройка уже полностью видна после стройки
+  fx.dust(b.x + b.w / 2, b.y + b.d / 2, 14 + b.w * 2); fx.sparkle(b.x + b.w / 2, b.y + b.d / 2, 40, '#fff6b0', 6); sfx('place');
   if (HINTS[def.id] && !G.flags['h_' + def.id]) { G.flags['h_' + def.id] = 1; toast(HINTS[def.id]); }
   S.hooks.onPlaced && S.hooks.onPlaced(b);
-  return b;
 }
 export function nudgeWorldPlayer() {
   const p = G.player; if (G.scene !== 'world' || !G.blk[ti(Math.floor(p.x), Math.floor(p.y))]) return;
@@ -159,7 +167,7 @@ export function refundOf(b) {
 }
 export function demolish(b) {
   const def = BDEF[b.t];
-  eco.refund(refundOf(b), 0.6);
+  eco.refund(refundOf(b), b.bld ? 1 : 0.6);   // отмена стройки возвращает всё
   if (b.in) for (const it of b.in.items) { const fd = S.furnDef && S.furnDef(it.t); if (fd) eco.refund(fd.cost, 0.6); }
   removeBld(b);
   G.pets = G.pets.filter((p) => p.home !== b.id);
@@ -177,6 +185,13 @@ function rollGive(give) {
   for (const k in give) out[k] = rndi(give[k][0], give[k][1]);
   return out;
 }
+// собранные какашки сами уходят в ближайшую компостную кучу; нет кучи — просто убираются
+function toCompost(n) {
+  let best = null, bd = 1e9;
+  for (const o of G.bMap.values()) if (BDEF[o.t].compost && !o.bld) { const d = Math.hypot(o.x - n.x, o.y - n.y); if (d < bd) { bd = d; best = o; } }
+  if (best) { best.st.load = (best.st.load || 0) + 1; fx.floatText(best.x + .5, best.y + .5, '+♻️', '#cfe8a0', 30); fx.floatText(n.x + .5, n.y + .5, 'В компост', '#cfe8a0', 22); stat('poopCompost'); }
+  else fx.floatText(n.x + .5, n.y + .5, 'Убрано', '#e8e0d0', 22);
+}
 function finishGather(n, g) {
   let got = rollGive(g.give);
   if (g.bonus) for (const k in g.bonus) if (chance(g.bonus[k][0])) got[k] = (got[k] || 0) + rndi(g.bonus[k][1], g.bonus[k][2]);
@@ -186,6 +201,7 @@ function finishGather(n, g) {
   if (txt.length) fx.floatText(n.x + .5, n.y + .5, txt.join(' '), '#fff6d0');
   if (full) toast('Склад переполнен — построй ящик или корзину', 'warn');
   stat('gathered');
+  if (n.t === 'poop') toCompost(n);
   if (g.after === 'remove') removeNode(n);
   else if (g.after === 'empty') { n.st = 'empty'; n.tm = g.regrow * rnd(.8, 1.2); }
   else if (g.after === 'stump') { n.st = 'stump'; n.tm = rnd(650, 900); G.dirtyBlk = true; stat('chopped'); }
@@ -197,7 +213,7 @@ export function gatherNode(n) {
   const def = NDEF[n.t], g = def.gather(n);
   if (!g) { toast(n.st === 'empty' ? 'Здесь пока пусто — подожди, отрастёт' : 'Пока нечего собирать'); return; }
   if (g.tool && !hasTool(g.tool)) { toast(toolMsg(g.tool), 'warn'); return; }
-  const full = Object.keys(g.give).every((k) => eco.space(k) <= 0);
+  const full = Object.keys(g.give).length > 0 && Object.keys(g.give).every((k) => eco.space(k) <= 0);
   if (full) { toast('Склад полон: нет места для ' + Object.keys(g.give).map(itemName).join(', '), 'warn'); return; }
   const ok = pl.goToRect(n.x, n.y, 1, 1, () => {
     pl.startWork(g.verb, g.time, g.fx, () => finishGather(n, g), { faceTo: [n.x + .5, n.y + .5], tick: () => { if (Math.random() < .08) n.shk = performance.now() / 1000; } });
@@ -489,11 +505,38 @@ export function sauna(b) {
   if (!takeWaterFor(b, 3)) { toast('Нужна вода: бак рядом или 3 ведра воды', 'warn'); return; }
   doAt(b, 'Парюсь', 16, 'bathe', () => { G.needs.warmth = 100; G.needs.energy = Math.min(100, G.needs.energy + 15); addBuff('mood', 30, 420); addBuff('warm', 50, 300); stat('saunas'); fx.sparkle(G.player.x, G.player.y, 30, '#ffe6b0', 10); sfx('chime'); });
 }
-export function petPet(pet) {
+// сколько сытости даст лучшая «дешёвая» еда из рюкзака (сначала сырая рыба/яйцо, потом готовое)
+export const petFoodHave = (pet) => Object.keys(PET_FOOD[pet.kind]).filter((k) => eco.has(k));
+const near = (pet, fn) => {
   const dd = Math.hypot(G.player.x - pet.x, G.player.y - pet.y);
-  const go = () => { pet.sleep = false; fx.hearts(pet.x, pet.y, 22); addBuff('mood', 10, 180); stat('pets'); pet.love = (pet.love || 0) + 1; sfx(pet.kind === 'cat' ? 'meow' : 'woof'); toast(pet.kind === 'cat' ? 'Мурр… ♥' : 'Гав! ♥'); };
-  if (dd < 1.6) pl.startWork('Глажу', 2.2, 'pick', go, { faceTo: [pet.x, pet.y] });
-  else pl.goTo(Math.floor(pet.x), Math.floor(pet.y), () => pl.startWork('Глажу', 2.2, 'pick', go, { faceTo: [pet.x, pet.y] }));
+  pet.tx = null; pet.sleep = false; pet.t = Math.max(pet.t || 0, 5);   // питомец замирает, пока с ним возятся
+  if (dd < 1.6) fn(); else pl.goTo(Math.floor(pet.x), Math.floor(pet.y), fn);
+};
+export function feedPet(pet, item) {
+  const val = PET_FOOD[pet.kind][item];
+  if (!val || !eco.has(item)) { toast('Нечем кормить: ' + (pet.kind === 'cat' ? 'рыба, молоко, яйца' : 'рыба, яйца, сыр, хлеб'), 'warn'); return; }
+  if ((pet.hunger ?? 70) > 92) { toast(petWord(pet) + ' не голоден'); return; }
+  near(pet, () => pl.startWork('Кормлю', 1.6, 'pick', () => {
+    if (!eco.take(item, 1)) return;
+    pet.hunger = Math.min(100, (pet.hunger ?? 70) + val); pet.bond = Math.min(100, (pet.bond ?? 40) + 3); pet.job = null; pet.starve = 0; pet.ask = 0;
+    if (pet.kind === 'dog') pet.poopT = Math.min(pet.poopT ?? 100, rnd(40, 90));   // поел — скоро на прогулку «по делам»
+    fx.hearts(pet.x, pet.y, 16); fx.floatText(pet.x, pet.y, `+${itemIcon(item)}`, '#fff6d0', 30); sfx(pet.kind === 'cat' ? 'meow' : 'woof'); stat('petFed');
+  }, { faceTo: [pet.x, pet.y] }));
+}
+export function petPet(pet) {
+  // голодному питомцу сначала предложим еду, если она есть в рюкзаке
+  if ((pet.hunger ?? 70) < HUNGRY) {
+    const have = petFoodHave(pet);
+    if (have.length) { feedPet(pet, have[0]); return; }
+    toast(petWord(pet) + ' просит есть: ' + (pet.kind === 'cat' ? 'рыба, молоко или яйца' : 'рыба, яйца, сыр или хлеб'), 'warn');
+  }
+  const go = () => {
+    pet.sleep = false; fx.hearts(pet.x, pet.y, 22);
+    const bond = pet.bond ?? 40; addBuff('mood', Math.round(6 + bond * .06), 180);
+    stat('pets'); pet.love = (pet.love || 0) + 1; pet.bond = Math.min(100, bond + (pet.ask > 0 ? 4 : 2)); pet.ask = 0;
+    sfx(pet.kind === 'cat' ? 'meow' : 'woof'); toast(pet.kind === 'cat' ? 'Мурр… ♥' : 'Гав! ♥');
+  };
+  near(pet, () => pl.startWork('Глажу', 2.2, 'pick', go, { faceTo: [pet.x, pet.y] }));
 }
 export function readLetter(b) {
   if (!b.st.letter) { toast('Писем нет. Может, завтра?'); return; }

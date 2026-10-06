@@ -26,6 +26,12 @@ export function openModal(title, body, opts = {}) {
   sfx('ui');
   return wrap;
 }
+// Подтверждение внутри игры (системный confirm() в некоторых окнах и встроенных браузерах молча отклоняется)
+export function askConfirm(title, text, okLabel, onYes) {
+  openModal(title, h('div', { class: 'menu' }, h('p', null, text),
+    h('button', { class: 'danger', onclick: () => { closeModal(); onYes(); } }, okLabel),
+    h('button', { onclick: () => closeModal() }, 'Отмена')), { cls: 'narrow' });
+}
 export function closeModal(silent) {
   if (!UI.modal) return;
   const m = UI.modal; UI.modal = null; m.wrap.remove(); if (m.onClose && !silent) m.onClose();

@@ -6,7 +6,7 @@ import { FDEF } from '../data/furniture.js';
 
 export function recomputeCaps() {
   const bonus = {};
-  for (const b of G.bMap.values()) { const cap = BDEF[b.t]?.cap; if (cap) for (const k in cap) bonus[k] = (bonus[k] || 0) + cap[k]; }
+  for (const b of G.bMap.values()) { const cap = !b.bld && BDEF[b.t]?.cap; if (cap) for (const k in cap) bonus[k] = (bonus[k] || 0) + cap[k]; }
   for (const h of G.bMap.values()) if (BDEF[h.t].home && h.in) for (const it of h.in.items) { const f = FDEF[it.t]?.cap; if (!f || (f._power && !h.st.powered)) continue; for (const k in f) if (k !== '_power') bonus[k] = (bonus[k] || 0) + f[k]; }
   G.capBonus = bonus;
 }

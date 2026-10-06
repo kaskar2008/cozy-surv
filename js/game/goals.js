@@ -8,7 +8,7 @@ import { sfx } from '../core/audio.js';
 
 const st = (k) => G.stats[k] || 0;
 const built = (id) => (G.built[id] || 0) > 0;
-const anyB = (f) => { for (const b of G.bMap.values()) if (f(b, BDEF[b.t])) return true; return false; };
+const anyB = (f) => { for (const b of G.bMap.values()) if (!b.bld && f(b, BDEF[b.t])) return true; return false; };
 export const GOALS = [
   { id: 'fire', ic: '🔥', name: 'Первый огонь', desc: 'Построй костёр (меню «Лагерь») и разожги его. Огонь — это тепло, свет и горячая еда.', ok: () => st('fires') >= 1, reward: { sticks: 6 } },
   { id: 'gather', ic: '🧺', name: 'Всё своими руками', desc: 'Собери 10 ресурсов: хворост, камни, ягоды, волокна… Просто нажимай на них.', ok: () => st('gathered') >= 10, reward: { fiber: 6 } },
