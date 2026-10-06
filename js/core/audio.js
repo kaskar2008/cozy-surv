@@ -4,9 +4,9 @@ const PENTA = [0, 2, 4, 7, 9];
 let delay = null;
 
 export function initAudio() {
-  if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+  if (ctx) { if (ctx.state === 'suspended' && !held) ctx.resume(); return; }
   try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
-  master = ctx.createGain(); master.gain.value = muted ? 0 : 0.8; master.connect(ctx.destination);
+  master = ctx.createGain(); master.gain.value = muted ? 0 : 0.8; master.connect(ctx.destination); if (held) ctx.suspend();
   const len = ctx.sampleRate * 2; noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
   const d = noiseBuf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
   // дождь
@@ -18,6 +18,13 @@ export function initAudio() {
   delay.connect(fb); fb.connect(delay); delay.connect(wet); wet.connect(master);
 }
 export const isMuted = () => muted;
+// пауза игры или неактивное окно: контекст замирает целиком — ни дождя, ни музыки, ни затухающих «хвостов»
+let held = false;
+export function setHeld(v) {
+  if (v === held) return; held = v;
+  if (!ctx) return;
+  if (v) ctx.suspend(); else ctx.resume();
+}
 export function setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : .8; try { localStorage.setItem('cozy-island-muted', m ? '1' : '0'); } catch (e) { } }
 
 function tone(freq, t0, dur, type = 'sine', vol = .1, dest, slide) {

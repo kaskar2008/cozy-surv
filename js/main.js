@@ -43,6 +43,10 @@ function resize() {
 }
 addEventListener('resize', resize); resize();
 
+// окно или вкладка неактивны — игра и звук на паузе (скорость не трогаем: вернулись — и всё продолжается)
+let away = document.hidden;
+const syncAway = () => { const a = document.hidden || !document.hasFocus(); if (a && !away) last = performance.now(); away = a; };
+addEventListener('blur', syncAway); addEventListener('focus', syncAway); document.addEventListener('visibilitychange', syncAway);
 let last = performance.now(), time = 0, audioT = 0, cardT = 0;
 let ivEma = 16.7, lowT = 0, highT = 0, lastDown = -1e9;
 function frame(ts) {
@@ -50,7 +54,7 @@ function frame(ts) {
   if (el < 12) { requestAnimationFrame(frame); return; }      // не больше ~60 кадров/с на 120–144 Гц экранах
   const rdt = Math.min(0.1, el / 1000); last = ts;
   // на паузе замираем всё анимированное: дождь, птицы, вода, дым, покачивание (сон считается ходом времени)
-  const paused = G.frozen || (!G.speed && !G.player.sleeping), dt = paused ? 0 : rdt; time += dt;
+  const paused = G.frozen || away || (!G.speed && !G.player.sleeping), dt = paused ? 0 : rdt; time += dt;
   // адаптивное разрешение: если кадры дольше ~24 мс — снижаем плотность пикселей, при запасе возвращаем
   if (el < 250) {
     ivEma = ivEma * 0.95 + el * 0.05;
@@ -61,7 +65,8 @@ function frame(ts) {
   try {
     let t0 = now();
     updateInput(rdt); t0 = mark('input', t0);
-    if (!G.frozen) simulate(rdt); t0 = mark('sim', t0);
+    audio.setHeld(paused);
+    if (!G.frozen && !away) simulate(rdt); t0 = mark('sim', t0);
     fx.update(dt, rdt);
     if (G.scene === 'world') fx.ambient(dt, time, G.weather.type);
     t0 = mark('fx', t0);

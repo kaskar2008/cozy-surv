@@ -218,6 +218,9 @@ export function openJournal(tab = 'goals', focus) {
 const root = document.documentElement;
 export const canFullscreen = !!(root.requestFullscreen || root.webkitRequestFullscreen);
 export const isFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+// в полном экране на телефоне системные панели прячутся, но вырез камеры и полоса жестов остаются — css берёт отступы из класса .fs
+const syncFs = () => root.classList.toggle('fs', isFullscreen());
+document.addEventListener('fullscreenchange', syncFs); document.addEventListener('webkitfullscreenchange', syncFs);
 export function toggleFullscreen() {
   const p = isFullscreen()
     ? (document.exitFullscreen || document.webkitExitFullscreen).call(document)
