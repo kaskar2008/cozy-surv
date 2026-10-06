@@ -84,7 +84,7 @@ export function updatePets(dt) {
       if (dd < .12) pet.tx = null;
       else {
         const nx = pet.x + dx / dd * sp, ny = pet.y + dy / dd * sp;
-        if (petOk(Math.floor(nx), Math.floor(ny))) { pet.x = nx; pet.y = ny; pet.moving = true; const sx = dx - dy; if (Math.abs(sx) > .05) pet.face = sx > 0 ? 1 : -1; }
+        if (petOk(Math.floor(nx), Math.floor(ny))) { pet.x = nx; pet.y = ny; pet.moving = true; pet.ang = Math.atan2(dy, dx); const sx = dx - dy; if (Math.abs(sx) > .05) pet.face = sx > 0 ? 1 : -1; }
         else { pet.tx = null; }
       }
     }
@@ -198,7 +198,7 @@ export function updateNPC(dt) {
 function stepAlong(n, dt, sp) {
   const tg = n.path[0], tx = tg.x + .5, ty = tg.y + .5, dx = tx - n.x, dy = ty - n.y, dd = Math.hypot(dx, dy), step = sp * dt;
   if (dd <= step) { n.x = tx; n.y = ty; n.path.shift(); } else { n.x += dx / dd * step; n.y += dy / dd * step; }
-  const sx = dx - dy; if (Math.abs(sx) > .05) n.face = sx > 0 ? 1 : -1; n.moving = true;
+  n.ang = Math.atan2(dy, dx); const sx = dx - dy; if (Math.abs(sx) > .05) n.face = sx > 0 ? 1 : -1; n.moving = true;
 }
 function spawnPoint(fire) {
   const f = flood(N, N, (x, y) => G.blk[y * N + x] === 1, Math.floor(fire.x), Math.floor(fire.y + 1.5));

@@ -4,7 +4,8 @@ import { newGame } from './game/init.js';
 import { load, save, wipe, getMode, setMode } from './game/save.js';
 import * as cloud from './game/cloud.js';
 import { cam, centerOn } from './render/camera.js';
-import { renderWorld, R } from './render/scene.js';
+import { renderWorld, initScene, R } from './render/scene.js';
+import { resizeGL } from './render/gl.js';
 import { renderInterior } from './game/interior.js';
 import { simulate } from './game/sim.js';
 import { ensureLinks } from './game/nets.js';
@@ -25,12 +26,14 @@ import { UI } from './ui/state.js';
 import * as api from './game/api.js';
 import { prof, mark, now, hooks } from './core/prof.js';
 
-const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+const canvas = document.getElementById('game'), overlay = document.getElementById('overlay'), ctx = overlay.getContext('2d');
+initScene(canvas);
 let quality = 1;
 function resize() {
   cam.dpr = Math.min(2, window.devicePixelRatio || 1) * quality; cam.W = innerWidth; cam.H = innerHeight;
-  canvas.width = Math.floor(cam.W * cam.dpr); canvas.height = Math.floor(cam.H * cam.dpr);
-  canvas.style.width = cam.W + 'px'; canvas.style.height = cam.H + 'px';
+  overlay.width = Math.floor(cam.W * cam.dpr); overlay.height = Math.floor(cam.H * cam.dpr);
+  for (const cv of [canvas, overlay]) { cv.style.width = cam.W + 'px'; cv.style.height = cam.H + 'px'; }
+  resizeGL();
 }
 addEventListener('resize', resize); resize();
 

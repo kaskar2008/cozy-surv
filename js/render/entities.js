@@ -1,126 +1,140 @@
-// Персонаж, питомцы, путник — рисуются кодом (чиби-стиль).
-import { proj } from '../core/iso.js';
+// Персонаж, питомцы, путник — собираются каждый кадр из 3D-примитивов (чиби-стиль).
+// Локальная система: +x — вперёд, y — вбок, высота в пикселях; размеры по земле в пикселях делятся на KX.
+import { box, blob, cyl, cone, line3, shadow, KX } from '../core/iso.js';
 import { shade } from '../core/util.js';
 import { HUNGRY } from '../data/pets.js';
+import { worldToScreen, cam } from './camera.js';
 
 export const SHIRTS = ['#e8845a', '#5a8fd6', '#6fb86a', '#d66a9a', '#e0b84a', '#8a6ad6'];
 export const HATS = ['Без шапки', 'Бини', 'Соломенная шляпа', 'Кепка', 'Цветочный венок'];
 
-function shadowAt(c, X, Y, r = 9) { c.fillStyle = 'rgba(30,20,40,.22)'; c.beginPath(); c.ellipse(X, Y, r, r * .5, 0, 0, 7); c.fill(); }
+const U = 1 / KX;
+// коробка с центром (cx, cy) в пикселях по земле, нижняя грань на z
+const bc = (c, cx, cy, z, w, d, h, col, o) => box(c, (cx - w / 2) * U, (cy - d / 2) * U, z, w * U, d * U, h, col, o);
+const ball = (c, cx, cy, z, rx, ry, col) => blob(c, cx * U, cy * U, z, rx, ry, col);
+const rod = (c, a, b, col, lw) => line3(c, [a[0] * U, a[1] * U, a[2]], [b[0] * U, b[1] * U, b[2]], col, lw);
+
+const defAng = (e) => ((e.face || 1) > 0 ? -Math.PI / 4 : Math.PI * .75);
+const angOf = (e) => (e.ang === undefined ? defAng(e) : e.ang);
 
 function person(c, o, t) {
-  // o: {moving, face, fx, shirt, hat, skin, hair, prog, cloak}
   const bob = o.moving ? Math.abs(Math.sin(t * 10)) * 2.2 : Math.sin(t * 2.2) * .7;
   const sw = o.moving ? Math.sin(t * 10) * 3.4 : 0;
   const sit = o.fx === 'sit', crouch = o.fx === 'pick';
-  const lower = sit ? 7 : crouch ? 5 : 0;
-  c.save(); c.scale(o.face || 1, 1);
+  const lower = sit ? 7 : crouch ? 5 : 0, skin = o.skin || '#f2cfa5', hair = o.hair || '#6a4a34';
+  shadow(c, 0, 0, .26, .22);
   // ноги
-  if (!sit) { c.fillStyle = '#5a4a6a'; c.fillRect(-4.5 + sw * .3, -10 + lower * .4, 3.6, 10 - lower * .4); c.fillRect(1 - sw * .3, -10 + lower * .4, 3.6, 10 - lower * .4); c.fillStyle = '#3a2a2a'; c.fillRect(-5 + sw * .3, -2, 4.6, 2.4); c.fillRect(.6 - sw * .3, -2, 4.6, 2.4); }
-  else { c.fillStyle = '#5a4a6a'; c.fillRect(-4, -6, 11, 4); c.fillStyle = '#3a2a2a'; c.fillRect(6, -6, 3.4, 4.6); }
+  if (!sit) {
+    for (const s of [-1, 1]) {
+      const sx = s * sw * .5;
+      bc(c, sx, s * 2.6, lower * .4, 3.8, 3.8, 10 - lower * .4, '#5a4a6a');
+      bc(c, sx + 1, s * 2.6, 0, 6, 4.2, 2.6, '#3a2a2a');
+    }
+  } else {
+    for (const s of [-1, 1]) { bc(c, 4.5, s * 2.6, 3, 11, 3.8, 4, '#5a4a6a'); bc(c, 10, s * 2.6, 1, 3.4, 4, 5, '#3a2a2a'); }
+  }
   // торс
-  const ty = -26 + lower - bob * .5;
-  c.fillStyle = o.shirt; c.beginPath(); c.roundRect(-6.5, ty, 13, 16 - lower * .3, 4); c.fill();
-  c.fillStyle = 'rgba(255,255,255,.14)'; c.fillRect(-6.5, ty, 13, 3);
-  if (o.cloak) { c.fillStyle = o.cloak; c.beginPath(); c.moveTo(-8, ty - 1); c.lineTo(8, ty - 1); c.lineTo(10, ty + 18); c.lineTo(-10, ty + 18); c.closePath(); c.fill(); }
+  const tz = 10 + (sit ? 0 : -lower * .3) - bob * .3, th = 16 - lower * .3;
+  bc(c, 0, 0, tz, 8, 12.5, th, o.shirt);
+  bc(c, 0, 0, tz + th - 3, 8.2, 12.7, 3, shade(o.shirt, .14));
+  if (o.cloak) bc(c, -2.6, 0, tz - 6, 3, 14, th + 6, o.cloak);
   // руки
-  c.fillStyle = shade(o.shirt, -.1);
-  let ax = 0, ay = 0;
-  if (o.fx === 'chop') { const k = Math.sin((o.prog || 0) * 18); ax = 4; ay = -7 - k * 5; }
-  else if (o.fx === 'pick') { ax = 2; ay = 3 + Math.sin((o.prog || 0) * 14) * 2; }
-  c.beginPath(); c.ellipse(-7, ty + 6 + sw * .4, 2.4, 4.4, 0, 0, 7); c.fill();
-  c.beginPath(); c.ellipse(7 + ax, ty + 6 + ay - sw * .4, 2.4, 4.4, 0, 0, 7); c.fill();
-  c.fillStyle = o.skin || '#f2cfa5'; c.beginPath(); c.arc(7 + ax, ty + 9.4 + ay - sw * .4, 2, 0, 7); c.fill();
-  if (o.fx === 'chop') { c.save(); c.translate(8 + ax, ty + 8 + ay); c.rotate(-.6 + Math.sin((o.prog || 0) * 18) * .9); c.fillStyle = '#7b5535'; c.fillRect(-1, -12, 2.2, 15); c.fillStyle = '#b4b8c0'; c.fillRect(0, -13, 6, 5); c.restore(); }
-  if (o.fx === 'fish') { c.strokeStyle = '#7b5535'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(7, ty + 8); c.lineTo(22, ty - 12); c.stroke(); }
-  if (o.fx === 'read') { c.fillStyle = '#e8d6b6'; c.fillRect(1, ty + 5, 9, 7); c.fillStyle = '#b4584a'; c.fillRect(1, ty + 5, 9, 1.6); }
-  if (o.fx === 'eat') { c.fillStyle = '#e8b86a'; c.beginPath(); c.arc(9, ty - 1, 3, 0, 7); c.fill(); }
+  const sh = tz + th - 3, arm = shade(o.shirt, -.1);
+  let ax = 0, az = 0;
+  if (o.fx === 'chop') { const k = Math.sin((o.prog || 0) * 18); ax = 7 + k * 2; az = 6 - Math.abs(k) * 12; }
+  else if (o.fx === 'pick') { ax = 6; az = -9 + Math.sin((o.prog || 0) * 14) * 3; }
+  for (const s of [-1, 1]) {
+    const right = s > 0;
+    const hand = [sw * s * -.35 + (right ? ax : 0), s * 8, sh - 9 + (right ? az : 0) + bob * .2];
+    rod(c, [0, s * 6.6, sh], hand, arm, 3.6);
+    ball(c, hand[0], hand[1], hand[2] - 1, 2.1, 2.1, skin);
+    if (right && o.fx === 'chop') {
+      rod(c, [hand[0], hand[1], hand[2]], [hand[0] + 9, hand[1], hand[2] + 10 + az * .4], '#7b5535', 2.2);
+      bc(c, hand[0] + 10, hand[1], hand[2] + 8 + az * .4, 4, 1.6, 6, '#b4b8c0');
+    }
+    if (right && o.fx === 'fish') rod(c, [hand[0], hand[1], hand[2]], [hand[0] + 18, hand[1] + 2, hand[2] + 18], '#7b5535', 1.6);
+    if (right && o.fx === 'read') bc(c, hand[0] + 3, hand[1] - 4, hand[2], 7, 9, 1.8, '#e8d6b6');
+    if (right && o.fx === 'eat') ball(c, hand[0] + 3, hand[1], hand[2] + 3, 3, 3, '#e8b86a');
+  }
   // голова
-  const hy = ty - 8 - bob * .3;
-  c.fillStyle = o.skin || '#f2cfa5'; c.beginPath(); c.arc(0, hy, 7.2, 0, 7); c.fill();
-  c.fillStyle = o.hair || '#6a4a34'; c.beginPath(); c.arc(0, hy - 1.4, 7.6, Math.PI * 1.02, Math.PI * 1.98); c.lineTo(5.6, hy - 3); c.lineTo(-6, hy - 2); c.fill();
-  c.fillRect(-7.4, hy - 3, 3, 8); c.beginPath(); c.arc(-4, hy + 4, 3.2, 0, 7); c.fill();
-  c.fillStyle = '#2a1e1e'; c.fillRect(1.4, hy - .6, 1.7, 2.2); c.fillRect(4.4, hy - .6, 1.7, 2.2);
-  c.fillStyle = 'rgba(240,120,120,.35)'; c.beginPath(); c.arc(3, hy + 3.4, 1.8, 0, 7); c.fill();
+  const hz0 = tz + th + 5.5 - bob * .2;
+  ball(c, 0, 0, hz0, 7.2, 7.2, skin);
+  ball(c, -1.4, 0, hz0 + 2, 7.7, 7.2, hair); ball(c, -4, 0, hz0 - 2.5, 5.2, 5.6, hair);
+  if (o.hair === '#8a8a8a') ball(c, -5, 0, hz0 - 5, 4, 4.4, hair);
+  bc(c, 6.6, 2.3, hz0 + .6, 1.4, 1.6, 2.4, '#2a1e1e'); bc(c, 6.6, -2.3, hz0 + .6, 1.4, 1.6, 2.4, '#2a1e1e');
+  bc(c, 6.2, 3.8, hz0 - 2.6, 1, 2, 1.6, '#f0a0a0'); bc(c, 6.2, -3.8, hz0 - 2.6, 1, 2, 1.6, '#f0a0a0');
   // шапки
   const hat = o.hat || 0;
-  if (hat === 1) { c.fillStyle = '#d9584a'; c.beginPath(); c.arc(0, hy - 2.4, 7.6, Math.PI, 0); c.fill(); c.fillStyle = '#f0e0c8'; c.fillRect(-7.6, hy - 3, 15.2, 2.6); c.beginPath(); c.arc(0, hy - 10, 2.2, 0, 7); c.fill(); }
-  if (hat === 2) { c.fillStyle = '#e3b95a'; c.beginPath(); c.ellipse(0, hy - 4, 12, 3.6, 0, 0, 7); c.fill(); c.beginPath(); c.arc(0, hy - 5, 6.2, Math.PI, 0); c.fill(); c.fillStyle = '#c94f43'; c.fillRect(-6.2, hy - 6.4, 12.4, 1.6); }
-  if (hat === 3) { c.fillStyle = '#4a7ad0'; c.beginPath(); c.arc(0, hy - 2.4, 7.5, Math.PI, 0); c.fill(); c.fillRect(1, hy - 3.6, 10, 2.2); }
-  if (hat === 4) { for (let i = 0; i < 7; i++) { const a = Math.PI + i * .52; c.fillStyle = ['#f08ac0', '#f5d34a', '#fff', '#8aa8f0'][i % 4]; c.beginPath(); c.arc(Math.cos(a) * 7, hy - 3 + Math.sin(a) * 4.4, 2, 0, 7); c.fill(); } }
-  c.restore();
+  if (hat === 1) { ball(c, -.3, 0, hz0 + 3, 7.7, 5.6, '#d9584a'); bc(c, 0, 0, hz0 + 1.2, 15.6, 15.6, 2.6, '#f0e0c8'); ball(c, 0, 0, hz0 + 10, 2.2, 2.2, '#f0e0c8'); }
+  if (hat === 2) { cyl(c, 0, 0, hz0 + 3.5, 11 * U, 1.8, '#e3b95a'); cyl(c, 0, 0, hz0 + 5, 6.2 * U, 5.5, '#e3b95a'); cyl(c, 0, 0, hz0 + 5, 6.4 * U, 1.8, '#c94f43'); }
+  if (hat === 3) { ball(c, -.3, 0, hz0 + 3, 7.6, 5.4, '#4a7ad0'); bc(c, 8, 0, hz0 + 2.6, 7, 11, 1.6, '#4a7ad0'); }
+  if (hat === 4) for (let i = 0; i < 8; i++) { const a = i / 8 * 6.283; ball(c, Math.cos(a) * 6.8, Math.sin(a) * 6.8, hz0 + 4.5, 2.2, 2.2, ['#f08ac0', '#f5d34a', '#ffffff', '#8aa8f0'][i % 4]); }
 }
 
-export function drawPlayer(c, p, t) {
-  const [X, Y] = proj(p.x, p.y, 0);
-  c.save(); c.translate(X, Y);
-  if (p.fx === 'sleep' || p.fx === 'nap') {
-    shadowAt(c, 0, 2, 16);
-    c.fillStyle = '#f2cfa5'; c.beginPath(); c.arc(-9, -6, 6.4, 0, 7); c.fill();
-    c.fillStyle = '#6a4a34'; c.beginPath(); c.arc(-9, -8, 6.6, Math.PI, 0); c.fill();
-    c.fillStyle = '#e8d6b6'; c.beginPath(); c.roundRect(-6, -10, 20, 11, 4); c.fill();
-    c.fillStyle = '#2a1e1e'; c.fillRect(-10, -6, 3, 1);
-    c.fillStyle = '#fff'; c.font = '600 13px sans-serif'; c.textAlign = 'center'; c.globalAlpha = .6 + .4 * Math.sin(t * 2);
-    c.fillText('z', 6, -22 - (t * 10 % 8)); c.fillText('Z', 14, -30 - (t * 10 % 8)); c.globalAlpha = 1;
-    c.restore(); return;
+function lying(c, skin, hair, pillow = '#e8d6b6') {
+  shadow(c, 0, 0, .4, .2);
+  ball(c, -9 * 1, 0, 8, 6.4, 6, skin); ball(c, -10, 0, 10, 6.8, 6, hair);
+  bc(c, 5, 0, 3, 20, 11, 8, pillow);
+  bc(c, -7, 2, 9, 1.4, 1.4, 1.6, '#2a1e1e');
+}
+
+function place(c, e, z = 0) { c.ox = e.x; c.oy = e.y; c.oz = z; c.setRot(angOf(e)); }
+
+export function buildPlayer(c, p, t) {
+  place(c, p);
+  if (p.fx === 'sleep' || p.fx === 'nap') { c.setRot(-Math.PI / 4); lying(c, '#f2cfa5', '#6a4a34'); return; }
+  if (p.fx === 'bathe') { ball(c, 0, 0, 22, 7.2, 7.2, '#f2cfa5'); ball(c, -1.4, 0, 24, 7.7, 7.2, '#6a4a34'); return; }
+  person(c, { moving: p.moving, fx: p.fx, shirt: SHIRTS[p.outfit.shirt % SHIRTS.length], hat: p.outfit.hat, prog: p.workT }, t);
+}
+export function buildTraveler(c, n, t) {
+  place(c, n);
+  person(c, { moving: n.moving, fx: n.sit ? 'sit' : null, shirt: '#6a5a8a', cloak: '#5a4a7a', hat: 0, hair: '#8a8a8a' }, t);
+  bc(c, -8, 0, 12, 6, 9, 13, '#8a6440');
+}
+export function buildPet(c, pet, t) {
+  place(c, pet);
+  const cat = pet.kind === 'cat', col = pet.col || (cat ? '#e8a05a' : '#c9915f'), dk = shade(col, -.25);
+  shadow(c, 0, 0, .22, .2);
+  if (pet.sleep) {
+    ball(c, 0, 0, 5, 10, 6, col); ball(c, 7, 0, 5, 5, 4, shade(col, -.15));
+    return;
   }
-  if (p.fx === 'bathe') {
-    c.fillStyle = '#f2cfa5'; c.beginPath(); c.arc(0, -22, 7.2, 0, 7); c.fill();
-    c.fillStyle = '#6a4a34'; c.beginPath(); c.arc(0, -23.4, 7.6, Math.PI, 0); c.fill(); c.fillRect(-7.4, -24, 3, 7);
-    c.fillStyle = '#2a1e1e'; c.fillRect(1.4, -22.6, 1.7, 2.2); c.fillRect(4.4, -22.6, 1.7, 2.2);
-    c.restore(); return;
-  }
-  shadowAt(c, 0, 1, 9);
-  person(c, { moving: p.moving, face: p.face, fx: p.fx, shirt: SHIRTS[p.outfit.shirt % SHIRTS.length], hat: p.outfit.hat, prog: p.workT }, t);
-  c.restore();
+  const bob = pet.moving ? Math.abs(Math.sin(t * 12)) * 1.6 : 0, sw = pet.moving ? Math.sin(t * 12) * 2 : 0;
+  ball(c, -2, 0, 9 + bob, 7.5, 5, col); ball(c, 3, 0, 9.5 + bob, 6, 5, col);
+  for (const [lx, ly, s] of [[4, 2.6, 1], [4, -2.6, -1], [-5, 2.6, -1], [-5, -2.6, 1]]) bc(c, lx + sw * s, ly, 0, 2.4, 2.4, 7 + bob, col);
+  ball(c, 9, 0, 13 + bob, cat ? 4.6 : 5, cat ? 4.4 : 4.8, col);
+  if (cat) { cone(c, 9 * U, 2.6 * U, 15 + bob, 1.6 * U, 5, col); cone(c, 9 * U, -2.6 * U, 15 + bob, 1.6 * U, 5, col); rod(c, [-8, 0, 10 + bob], [-14, 0, 18 + Math.sin(t * 3) * 3], col, 2.4); }
+  else { bc(c, 8, 4.4, 9 + bob, 2.4, 1.6, 6, dk); bc(c, 8, -4.4, 9 + bob, 2.4, 1.6, 6, dk); bc(c, 13, 0, 11 + bob, 3, 3, 2.6, '#3a2a22'); rod(c, [-8, 0, 11 + bob], [-13, 0, 16 + Math.sin(t * 9) * 2], col, 2.6); }
+  bc(c, 12, 2, 14 + bob, 1.2, 1.4, 1.8, '#2a1e1e'); bc(c, 12, -2, 14 + bob, 1.2, 1.4, 1.8, '#2a1e1e');
 }
 
-export function drawTraveler(c, n, t) {
-  const [X, Y] = proj(n.x, n.y, 0);
-  c.save(); c.translate(X, Y); shadowAt(c, 0, 1, 10);
-  person(c, { moving: n.moving, face: n.face, fx: n.sit ? 'sit' : null, shirt: '#6a5a8a', cloak: '#5a4a7a', hat: 0, hair: '#8a8a8a' }, t);
-  c.fillStyle = '#8a6440'; c.beginPath(); c.roundRect(-14 * (n.face || 1), -30, 8, 14, 3); c.fill();
-  if (n.gift) { c.fillStyle = '#fff'; c.font = '14px sans-serif'; c.textAlign = 'center'; c.fillText('🎁', 0, -50 + Math.sin(t * 3) * 2); }
-  c.restore();
-}
-
-// пузырёк над питомцем: голоден / пришёл за лаской
-function petBubble(c, pet, t) {
+// ───────── оверлеи в экранных координатах ─────────
+export function drawPetBubble(c, pet, t) {
   const hungry = (pet.hunger ?? 70) < HUNGRY, ic = hungry ? (pet.kind === 'cat' ? '🐟' : '🍖') : pet.ask > 0 ? '💗' : null;
   if (!ic || pet.job) return;
-  c.save(); c.scale(pet.face || 1, 1); const y = -(pet.sleep ? 26 : 33) + Math.sin(t * 3) * 1.8;
-  c.fillStyle = 'rgba(255,250,240,.94)'; c.strokeStyle = 'rgba(120,90,60,.35)'; c.lineWidth = 1; c.beginPath(); c.arc(0, y, 9, 0, 7); c.fill(); c.stroke();
-  c.font = '11px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#000'; c.fillText(ic, 0, y + 1); c.restore();
+  const [X, Y0] = worldToScreen(pet.x, pet.y, pet.sleep ? 22 : 30), k = Math.max(.8, cam.zoom), y = Y0 + Math.sin(t * 3) * 1.8;
+  c.save(); c.fillStyle = 'rgba(255,250,240,.94)'; c.strokeStyle = 'rgba(120,90,60,.35)'; c.lineWidth = 1;
+  c.beginPath(); c.arc(X, y, 9 * k, 0, 7); c.fill(); c.stroke();
+  c.font = `${11 * k}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#000'; c.fillText(ic, X, y + 1); c.restore();
 }
-export function drawPet(c, pet, t) {
-  const [X, Y] = proj(pet.x, pet.y, 0);
-  c.save(); c.translate(X, Y); shadowAt(c, 0, 1, 8);
-  c.scale(pet.face || 1, 1);
-  const cat = pet.kind === 'cat', col = pet.col || (cat ? '#e8a05a' : '#c9915f'), bob = pet.moving ? Math.abs(Math.sin(t * 12)) * 1.6 : 0;
-  if (pet.sleep) {
-    c.fillStyle = col; c.beginPath(); c.ellipse(0, -5, 10, 6, 0, 0, 7); c.fill(); c.fillStyle = shade(col, -.15); c.beginPath(); c.ellipse(-7, -6, 5, 4, 0, 0, 7); c.fill();
-    c.fillStyle = '#fff'; c.font = '600 11px sans-serif'; c.textAlign = 'center'; c.globalAlpha = .6 + .4 * Math.sin(t * 2); c.fillText('z', 6, -16 - (t * 8 % 6)); c.globalAlpha = 1;
-    petBubble(c, pet, t); c.restore(); return;
-  }
-  c.fillStyle = col;
-  c.beginPath(); c.ellipse(0, -8 - bob, cat ? 8 : 9, cat ? 5 : 5.4, 0, 0, 7); c.fill();
-  c.fillRect(-5, -6 - bob, 2.4, 6 + bob); c.fillRect(3, -6 - bob, 2.4, 6 + bob);
-  c.beginPath(); c.arc(8, -12 - bob, cat ? 4.6 : 5, 0, 7); c.fill();
-  if (cat) { c.beginPath(); c.moveTo(5, -15 - bob); c.lineTo(6, -20 - bob); c.lineTo(9, -16 - bob); c.moveTo(9, -16 - bob); c.lineTo(12, -20 - bob); c.lineTo(12, -14 - bob); c.fill(); c.strokeStyle = col; c.lineWidth = 2.4; c.lineCap = 'round'; c.beginPath(); c.moveTo(-8, -9); c.quadraticCurveTo(-15, -14 + Math.sin(t * 3) * 3, -12, -20); c.stroke(); }
-  else { c.fillStyle = shade(col, -.25); c.beginPath(); c.ellipse(11, -9 - bob, 2.6, 4, .4, 0, 7); c.fill(); c.beginPath(); c.ellipse(5.4, -13 - bob, 2.2, 4, -.3, 0, 7); c.fill(); c.strokeStyle = col; c.lineWidth = 2.6; c.lineCap = 'round'; c.beginPath(); c.moveTo(-9, -10); c.lineTo(-13, -15 + Math.sin(t * 9) * 2); c.stroke(); }
-  c.fillStyle = '#2a1e1e'; c.fillRect(9, -13 - bob, 1.4, 1.8); c.fillRect(11.6, -12 - bob, 1.2, 1.5);
-  petBubble(c, pet, t); c.restore();
+export function drawZ(c, e, t, z0 = 22) {
+  const [X, Y] = worldToScreen(e.x, e.y, z0), k = Math.max(.8, cam.zoom);
+  c.save(); c.fillStyle = '#fff'; c.font = `600 ${13 * k}px sans-serif`; c.textAlign = 'center'; c.globalAlpha = .6 + .4 * Math.sin(t * 2);
+  c.fillText('z', X + 8 * k, Y - (t * 10 % 8) * k); c.fillText('Z', X + 16 * k, Y - 8 * k - (t * 10 % 8) * k); c.restore();
 }
-
+export function drawGift(c, n, t) {
+  const [X, Y] = worldToScreen(n.x, n.y, 50), k = Math.max(.8, cam.zoom);
+  c.save(); c.font = `${14 * k}px sans-serif`; c.textAlign = 'center'; c.fillText('🎁', X, Y + Math.sin(t * 3) * 2); c.restore();
+}
 // Индикатор прогресса действия над персонажем
 export function drawWorkRing(c, p) {
   const w = p.work; if (!w || w.dur < .9) return;
-  const [X, Y] = proj(p.x, p.y, 58), k = Math.min(1, w.prog / w.dur);
+  const [X, Y] = worldToScreen(p.x, p.y, 58), k0 = Math.min(1, w.prog / w.dur), s = Math.max(.85, cam.zoom);
   c.save();
-  c.fillStyle = 'rgba(255,248,234,.92)'; c.beginPath(); c.arc(X, Y, 11, 0, 7); c.fill();
-  c.lineWidth = 3.4; c.strokeStyle = 'rgba(120,80,40,.2)'; c.beginPath(); c.arc(X, Y, 8, 0, 7); c.stroke();
-  c.strokeStyle = '#e28a4a'; c.lineCap = 'round'; c.beginPath(); c.arc(X, Y, 8, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); c.stroke();
-  c.font = '600 11px ui-rounded, system-ui, sans-serif'; c.textAlign = 'center'; c.lineWidth = 3; c.strokeStyle = 'rgba(40,30,20,.6)'; c.fillStyle = '#fff';
-  c.strokeText(w.label, X, Y - 17); c.fillText(w.label, X, Y - 17);
+  c.fillStyle = 'rgba(255,248,234,.92)'; c.beginPath(); c.arc(X, Y, 11 * s, 0, 7); c.fill();
+  c.lineWidth = 3.4 * s; c.strokeStyle = 'rgba(120,80,40,.2)'; c.beginPath(); c.arc(X, Y, 8 * s, 0, 7); c.stroke();
+  c.strokeStyle = '#e28a4a'; c.lineCap = 'round'; c.beginPath(); c.arc(X, Y, 8 * s, -Math.PI / 2, -Math.PI / 2 + k0 * Math.PI * 2); c.stroke();
+  c.font = `600 ${11 * s}px ui-rounded, system-ui, sans-serif`; c.textAlign = 'center'; c.lineWidth = 3; c.strokeStyle = 'rgba(40,30,20,.6)'; c.fillStyle = '#fff';
+  c.strokeText(w.label, X, Y - 17 * s); c.fillText(w.label, X, Y - 17 * s);
   c.restore();
 }
