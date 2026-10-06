@@ -1,0 +1,12 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Каждый игрок видит и меняет только своё сохранение (до ~1 МБ).
+    match /users/{uid}/saves/{saveId} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.blob is string && request.resource.data.blob.size() < 1000000;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

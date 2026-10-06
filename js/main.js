@@ -1,7 +1,8 @@
 // Точка входа: инициализация, главный цикл, автосохранение.
 import { G, N, darkness, season } from './game/state.js';
 import { newGame } from './game/init.js';
-import { load, save, hasSave, wipe } from './game/save.js';
+import { load, save, wipe, getMode, setMode } from './game/save.js';
+import * as cloud from './game/cloud.js';
 import { cam, centerOn } from './render/camera.js';
 import { renderWorld, R } from './render/scene.js';
 import { renderInterior } from './game/interior.js';
@@ -17,6 +18,8 @@ import { buildHUD, updateHUD, setSpeed } from './ui/hud.js';
 import { buildBar, renderBar, updateCards } from './ui/buildbar.js';
 import { initPanel, updatePanel, clearSelection } from './ui/panel.js';
 import { openIntro } from './ui/modals.js';
+import { chooseStorage, resolveSave, watchConflicts } from './ui/cloud.js';
+import { toast } from './ui/ui.js';
 import { initInput, updateInput } from './input.js';
 import { UI } from './ui/state.js';
 import * as api from './game/api.js';
@@ -67,22 +70,36 @@ function frame(ts) {
   requestAnimationFrame(frame);
 }
 
-function boot() {
+async function boot() {
   let fresh = false;
-  if (new URLSearchParams(location.search).has('fresh')) { wipe(); history.replaceState(null, '', location.pathname); }
-  if (hasSave() && load()) { /* продолжаем */ } else { newGame(); fresh = true; }
+  const wantFresh = new URLSearchParams(location.search).has('fresh');
+  if (wantFresh) history.replaceState(null, '', location.pathname);
+  const src = await resolveSave(wantFresh);   // локально — сразу; в облачном режиме — после входа в аккаунт
+  if (src.raw && load(src.raw)) { /* продолжаем */ } else { newGame(); fresh = true; }
+  const picker = fresh && src.picker;
   ensureLinks(); computeCozy();
   initUI(); buildHUD(); buildBar(); initPanel(); initInput(canvas);
   centerOn(G.player.x, G.player.y); cam.zoom = innerWidth < 700 ? 0.8 : 1.05;
   G.speed = G.speed ?? 1; if (G.speed === 0 && !fresh) G.speed = 1;
   renderBar();
   setInterval(() => save(), 30000);
-  addEventListener('beforeunload', () => save());
-  document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+  addEventListener('beforeunload', () => { save(); cloud.flush(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { save(); cloud.flush(); } });
+  watchConflicts();
+  if (src.offline) toast('Нет связи с облаком — играем с сохранения на устройстве, позже отправим');
+  if (src.push) { save(); cloud.flush(); }
   // новая игра = чистый первый запуск: стираем сохранение и перезагружаем страницу (?fresh=1) — дальше всё как при первом открытии, с приветственным окном и паузой
-  S.hooks.newGame = () => { wipe(); location.replace(location.pathname + '?fresh=1'); };
+  S.hooks.newGame = async () => {
+    G.noSave = true;   // иначе при закрытии страницы старая игра сохранится заново
+    if (getMode() === 'cloud') { toast('Удаляю игру из облака…'); try { await cloud.deleteSave(); } catch (e) { } }
+    wipe(); setMode(null); location.replace(location.pathname + '?fresh=1');
+  };
   S.hooks.onSceneChange = () => { clearSelection(); UI.tool = 'select'; UI.def = null; UI.fdef = null; R.ghost = null; renderBar(); };
-  if (fresh) { G.noSave = true; setSpeed(0); openIntro(() => { delete G.noSave; setSpeed(1); save(); }); }
+  if (fresh) {
+    G.noSave = true; setSpeed(0);
+    const intro = () => openIntro(() => { delete G.noSave; setSpeed(1); save(); });
+    picker ? chooseStorage(intro) : intro();
+  }
   window.cozy = { quality: () => quality, G, S, api, BDEF, cam, R, UI, save, load, prof, syncProf: (on) => { hooks.sync = on ? () => ctx.getImageData(0, 0, 1, 1) : null; } };
   requestAnimationFrame(frame);
 }

@@ -178,3 +178,10 @@ body.touch .bb-handle { width: 120px; height: 34px; top: -34px; }
 .rc-ic { font-size: 22px; } .rc-t { font-size: 12px; color: var(--ink2); font-variant-numeric: tabular-nums; } .rc-body small { display: block; }
 
 .goal.flash { animation: goalflash 1.8s ease; } @keyframes goalflash { 0%, 60% { box-shadow: 0 0 0 3px #f2b36a; background: #fff1cf; } }
+
+/* облачное сохранение: выбор места, форма входа */
+.choice { display: flex; align-items: center; gap: 14px; text-align: left; padding: 12px 16px; border-radius: 16px; } .choice .ci { font-size: 30px; } .choice > div { display: flex; flex-direction: column; gap: 2px; } .choice small { color: var(--ink2); font-size: 13px; line-height: 1.35; }
+.auth { display: flex; flex-direction: column; gap: 8px; }
+.inp { font: inherit; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--line); background: #fff; color: var(--ink); -webkit-user-select: text; user-select: text; } .inp:focus { outline: 2px solid var(--accent2); }
+.auth-msg { min-height: 1.3em; margin: 0; font-size: 14px; color: var(--red); } .auth-msg.ok { color: var(--green); }
+button.link { border: 0; background: transparent; box-shadow: none !important; color: var(--ink2); text-decoration: underline; padding: 2px 6px; font-size: 14px; }

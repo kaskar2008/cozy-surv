@@ -71,3 +71,7 @@ export function h(tag, attrs, ...kids) {
   return el;
 }
 export const $ = (s, r = document) => r.querySelector(s);
+
+// ---- base64 для бинарных данных ----
+export const b64 = (arr) => { let s = ''; for (let i = 0; i < arr.length; i += 8192) s += String.fromCharCode.apply(null, arr.subarray(i, i + 8192)); return btoa(s); };
+export const unb64 = (s) => { const bin = atob(s), a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; };

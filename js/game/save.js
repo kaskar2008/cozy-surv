@@ -1,32 +1,48 @@
-// Сохранение в localStorage.
+// Сохранение: всегда в localStorage (кеш), а в облачном режиме ещё и в Firestore (см. cloud.js).
 import { G, N, DAY } from './state.js';
 import { rebuildOcc } from './world.js';
+import { b64, unb64 } from '../core/util.js';
+import * as cloud from './cloud.js';
 
 const KEY = 'cozy-island-save-v1';
-const b64 = (arr) => { let s = ''; for (let i = 0; i < arr.length; i += 8192) s += String.fromCharCode.apply(null, arr.subarray(i, i + 8192)); return btoa(s); };
-const unb64 = (s) => { const bin = atob(s), a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; };
+const MODE_KEY = 'cozy-island-mode';
 const SKIP = new Set(['nb', 'pop', 'mask', 'shk', 'comp']);
 const replacer = (k, v) => (k.startsWith('_') || SKIP.has(k) ? undefined : v);
 
-export function hasSave() { try { return !!localStorage.getItem(KEY); } catch (e) { return false; } }
+// Режим хранения: 'local' (только это устройство), 'cloud' (аккаунт + облако) или null (ещё не выбран).
+export const getMode = () => { try { const m = localStorage.getItem(MODE_KEY); return m === 'cloud' || m === 'local' ? m : null; } catch (e) { return null; } };
+export const setMode = (m) => { try { m ? localStorage.setItem(MODE_KEY, m) : localStorage.removeItem(MODE_KEY); } catch (e) { } };
+// Облачный кеш у каждого аккаунта свой, чтобы чужая игра не подмешалась в локальную.
+const cloudKey = (u) => `${KEY}:u:${u}`;
+const storeKey = () => getMode() === 'cloud' ? (cloud.uid() ? cloudKey(cloud.uid()) : null) : KEY;
+export function readCache(u) { try { const raw = localStorage.getItem(cloudKey(u)); return raw ? { json: raw, savedAt: JSON.parse(raw).savedAt || 0 } : null; } catch (e) { return null; } }
+export function writeCache(u, json) { try { localStorage.setItem(cloudKey(u), json); return true; } catch (e) { return false; } }
+export const readLocal = () => { try { return localStorage.getItem(KEY); } catch (e) { return null; } };
+export function copyCloudToLocal() { try { const k = storeKey(); const raw = k && localStorage.getItem(k); if (raw) localStorage.setItem(KEY, raw); } catch (e) { } }
+export const dayOf = () => Math.floor(G.t / DAY) + 1;
+export function hasSave() { try { const k = storeKey(); return !!k && !!localStorage.getItem(k); } catch (e) { return false; } }
 export function save() {
   if (G.noSave) return false;   // пока открыто приветственное окно, новая игра не сохраняется: перезагрузка снова покажет его
+  const key = storeKey(); if (!key) return false;   // облачный режим, но аккаунт ещё не определён
   try {
     const data = {
-      ver: 1, dayLen: DAY, seed: G.seed, t: G.t, inv: G.inv, needs: G.needs, buffs: G.buffs, weather: G.weather, wx: G.wx, sky: { rainbow: G.sky.rainbow, aurora: G.sky.aurora, star: null },
+      ver: 1, savedAt: Date.now(), day: dayOf(), dayLen: DAY, seed: G.seed, t: G.t, inv: G.inv, needs: G.needs, buffs: G.buffs, weather: G.weather, wx: G.wx, sky: { rainbow: G.sky.rainbow, aurora: G.sky.aurora, star: null },
       stats: G.stats, goals: G.goals, flags: G.flags, built: G.built, pets: G.pets, mail: G.mail, uid: G.uid, nid: G.nid, bid: G.bid, speed: G.speed,
       tiles: b64(G.tiles), shd: b64(G.shd), det: b64(G.det),
       nodes: [...G.nodeMap.values()], blds: [...G.bMap.values()],
       player: { ...G.player, path: [], work: null, fx: null, sleeping: false },
       inPos: G.scene !== 'world' ? G.outPos : null, scene: G.scene,
     };
-    localStorage.setItem(KEY, JSON.stringify(data, replacer));
+    const json = JSON.stringify(data, replacer);
+    localStorage.setItem(key, json);
+    if (getMode() === 'cloud') cloud.queue(json, data.savedAt, data.day);
     return true;
   } catch (e) { console.warn('save failed', e); return false; }
 }
-export function load() {
+export function load(raw) {
   try {
-    const raw = localStorage.getItem(KEY); if (!raw) return false;
+    if (raw == null) { const k = storeKey(); raw = k && localStorage.getItem(k); }
+    if (!raw) return false;
     const d = JSON.parse(raw);
     for (const k of Object.keys(G)) delete G[k];
     Object.assign(G, {
@@ -46,4 +62,4 @@ export function load() {
     return true;
   } catch (e) { console.warn('load failed', e); return false; }
 }
-export function wipe() { try { localStorage.removeItem(KEY); } catch (e) { } }
+export function wipe() { try { const k = storeKey(); if (k) localStorage.removeItem(k); } catch (e) { } }
