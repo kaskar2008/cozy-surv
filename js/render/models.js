@@ -89,7 +89,7 @@ export class Instancer {
 export class DynBatch {
   constructor(scene) {
     this.scene = scene;
-    this.b = new Builder(1, 1, 40);
+    this.b = new Builder(1, 1, 40); this.b.dyn = true;
     this.meshes = [];
     for (const [key, mat, order] of [['lit', MAT.lit, 0], ['emi', MAT.emi, 0], ['tr', MAT.tr, 2]]) {
       const g = new THREE.BufferGeometry();

@@ -11,7 +11,10 @@ export const HATS = ['Без шапки', 'Бини', 'Соломенная шл
 const U = 1 / KX;
 // коробка с центром (cx, cy) в пикселях по земле, нижняя грань на z
 const bc = (c, cx, cy, z, w, d, h, col, o) => box(c, (cx - w / 2) * U, (cy - d / 2) * U, z, w * U, d * U, h, col, o);
-const ball = (c, cx, cy, z, rx, ry, col) => blob(c, cx * U, cy * U, z, rx, ry, col);
+// seed фиксирован (не зависит от высоты, которая качается при дыхании) — неровная форма головы и причёски стабильна
+const ball = (c, cx, cy, z, rx, ry, col) => blob(c, cx * U, cy * U, z, rx, ry, col, { rough: 0 });
+// причёска чуть неровная (low-poly), но с фиксированной формой и небольшой амплитудой, чтобы не прорезать голову
+const hairBall = (c, cx, cy, z, rx, ry, col) => blob(c, cx * U, cy * U, z, rx, ry, col, { rough: .05, seed: cx * 1.7 + rx * 3.1 + ry });
 const rod = (c, a, b, col, lw) => line3(c, [a[0] * U, a[1] * U, a[2]], [b[0] * U, b[1] * U, b[2]], col, lw);
 
 const defAng = (e) => ((e.face || 1) > 0 ? -Math.PI / 4 : Math.PI * .75);
@@ -59,7 +62,7 @@ function person(c, o, t) {
   // голова
   const hz0 = tz + th + 5.5 - bob * .2;
   ball(c, 0, 0, hz0, 7.2, 7.2, skin);
-  ball(c, -1.4, 0, hz0 + 2, 7.7, 7.2, hair); ball(c, -4, 0, hz0 - 2.5, 5.2, 5.6, hair);
+  hairBall(c, -1.4, 0, hz0 + 2, 7.9, 7.4, hair); hairBall(c, -4, 0, hz0 - 2.5, 5.4, 5.8, hair);
   if (o.hair === '#8a8a8a') ball(c, -5, 0, hz0 - 5, 4, 4.4, hair);
   bc(c, 6.6, 2.3, hz0 + .6, 1.4, 1.6, 2.4, '#2a1e1e'); bc(c, 6.6, -2.3, hz0 + .6, 1.4, 1.6, 2.4, '#2a1e1e');
   bc(c, 6.2, 3.8, hz0 - 2.6, 1, 2, 1.6, '#f0a0a0'); bc(c, 6.2, -3.8, hz0 - 2.6, 1, 2, 1.6, '#f0a0a0');
@@ -75,7 +78,7 @@ function person(c, o, t) {
 function lying(c, skin, hair, cover = '#e8d6b6', pillow = 0) {
   shadow(c, 0, 0, .45, .16);
   const hz0 = 6 + pillow;
-  ball(c, 0, 0, hz0, 6.4, 6.2, skin); ball(c, -1.2, 0, hz0 + 1.8, 6.8, 6.2, hair);
+  ball(c, 0, 0, hz0, 6.4, 6.2, skin); hairBall(c, -1.2, 0, hz0 + 1.8, 6.9, 6.3, hair);
   bc(c, 15, 0, 1 + pillow * .3, 26, 11.5, 7, cover); bc(c, 15, 0, 7 + pillow * .3, 26, 11.7, 1.6, shade(cover, .12));
   bc(c, 5.4, 2.6, hz0 + .8, 1.4, 1.6, 1.6, '#2a1e1e'); bc(c, 5.4, -2.6, hz0 + .8, 1.4, 1.6, 1.6, '#2a1e1e');
 }

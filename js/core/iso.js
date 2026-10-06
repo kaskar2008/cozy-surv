@@ -272,7 +272,8 @@ export function blob(c, cx, cy, z, rx, ry, col, o = {}) {
   [cx, cy] = swp(cx, cy);
   const opt = typeof o === 'object' ? o : {};
   const k = K(c, col), b = bufOf(c, k), ctr = c.V(cx, cy, z), R = rx / KX, Ry = R * (ry / rx) * 1.15, { v, f } = ICOS[opt.detail ?? 1];
-  const rough = opt.rough ?? (rx >= 7 ? .13 : 0), seed = cx * 3.7 + cy * 5.3 + z * .31;
+  // в динамических деталях (персонажи, дым) форма не должна «плыть» от кадра к кадру: неровность только с явным seed
+  const rough = opt.rough ?? (rx >= 7 && !c.dyn ? .13 : 0), seed = opt.seed ?? (cx * 3.7 + cy * 5.3 + z * .31);
   const sc = rough ? v.map((q, i) => 1 + (hash3(i * 1.3, seed, q[1] * 9) - .5) * 2 * rough) : null;
   const p = (i) => { const m = sc ? sc[i] : 1; return [ctr[0] + v[i][0] * R * m, ctr[1] + v[i][1] * Ry * m, ctr[2] + v[i][2] * R * m]; };
   for (const [a, bb, cc] of f) { const A = p(a), B = p(bb), C = p(cc); b.tri(...A, ...B, ...C, k); }
