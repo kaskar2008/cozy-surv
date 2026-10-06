@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Three.js против Canvas 2D</title>
+<style>
+  :root { --bg:#f6f4ef; --fg:#26231f; --mut:#7a746a; --card:#fff; --line:#e1ddd3; --acc:#3f7d58; --accbg:#e5f1ea; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1d1b18; --fg:#ece8df; --mut:#a39d91; --card:#262420; --line:#3a3731; --acc:#7cc79a; --accbg:#27382d; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.4 system-ui, sans-serif; padding:16px; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  .lead { color:var(--mut); margin:0 0 12px; max-width:90ch; }
+  .controls { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; margin-bottom:12px; }
+  .controls label { display:flex; gap:6px; align-items:center; }
+  .grp { display:flex; gap:4px; align-items:center; }
+  button, select { font:inherit; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:4px 10px; cursor:pointer; }
+  button.on { background:var(--accbg); border-color:var(--acc); color:var(--acc); }
+  button.go { background:var(--acc); color:#fff; border-color:var(--acc); }
+  .panels { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width: 800px) { .panels { grid-template-columns:1fr; } }
+  .panel { position:relative; height:min(62vh, 560px); min-height:300px; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--card); }
+  .panel canvas { display:block; touch-action:none; cursor:grab; }
+  .tag { position:absolute; left:8px; top:8px; background:rgba(0,0,0,.62); color:#fff; border-radius:6px; padding:4px 8px; font-size:12px; pointer-events:none; }
+  .tag b { display:block; font-size:13px; }
+  #status { color:var(--mut); }
+  .tablewrap { overflow-x:auto; margin-top:14px; }
+  table { border-collapse:collapse; min-width:720px; width:100%; background:var(--card); border:1px solid var(--line); }
+  th, td { border:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top; }
+  td b { font-size:15px; } td span { color:var(--mut); margin-left:4px; } td small { display:block; color:var(--mut); font-size:11px; margin-top:2px; }
+  td.best { background:var(--accbg); }
+  .note { color:var(--mut); font-size:12px; max-width:100ch; margin-top:10px; }
+</style>
+</head>
+<body>
+<h1>Three.js против Canvas 2D</h1>
+<p class="lead">Один и тот же мир: слева — 2D-код игры (<code>draw()</code> построек и ресурсов, кэш спрайтов, тот же порядок отрисовки), справа — те же объекты как низкополигональные 3D-модели в ортографической камере 2:1. Тяните — двигать, колесо — зум (камера общая). Поворот на 90° (кнопки или Q/E) есть только у 3D — 2D-версия не умеет вращаться без перерисовки всех спрайтов.</p>
+
+<div class="controls">
+  <div class="grp">Объектов: <span id="nbtns" class="grp"></span></div>
+  <label>3D-режим
+    <select id="mode">
+      <option value="inst" selected>инстансинг (1 draw на тип)</option>
+      <option value="merged">слитый меш на объект</option>
+      <option value="naive">отдельный меш на каждую часть</option>
+    </select>
+  </label>
+  <label><input type="checkbox" id="shadows"> тени (shadow map)</label>
+  <label><input type="checkbox" id="freeze"> заморозить матрицы</label>
+  <label>DPR <select id="dpr"><option>1</option><option>2</option></select></label>
+  <span class="grp">Поворот 3D: <button id="rotL" title="Q">⟲ 90°</button><button id="rotR" title="E">⟳ 90°</button></span>
+  <button id="bench">Замерить сейчас</button>
+  <button id="matrix" class="go">Прогон всех сочетаний</button>
+  <span id="status"></span>
+</div>
+
+<div class="panels">
+  <div class="panel" id="p2d"><canvas id="c2d"></canvas><div class="tag"><b>Canvas 2D (как в игре)</b><span id="s2d"></span></div></div>
+  <div class="panel" id="p3d"><div id="gl"></div><div class="tag"><b>Three.js</b><span id="s3d"></span><br><span id="fps"></span></div></div>
+</div>
+
+<div class="tablewrap"><table id="table"></table></div>
+<p class="note">Метод замера: серия кадров подряд в одной задаче, в конце принудительное чтение пикселя (чтобы дождаться GPU); показано время на кадр, «cpu» — только время отправки команд. Не входит: освещение ночью, погода, частицы, интерфейс игры; в 2D ground — один предрисованный холст, как чанки в игре.</p>
+
+<script type="module" src="./main.js"></script>
+</body>
+</html>
