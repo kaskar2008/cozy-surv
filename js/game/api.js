@@ -474,8 +474,8 @@ export function eat(item) {
     if (e.t) n.thirst = clamp(n.thirst + e.t, 0, 100);
     if (e.w) addBuff('warm', e.w, 120);
     if (e.m) addBuff('mood', e.m, 90);
-    let bonus = diningBonus();
-    if (bonus) { addBuff('mood', bonus, 120); toast('Приятно поесть за столом 🍽️'); }
+    const dine = diningBonus();
+    if (dine) { addBuff('mood', dine, 120); toast('Приятно поесть за столом 🍽️'); }
     fx.floatText(G.player.x, G.player.y, `${itemIcon(item)} ${itemName(item)}`, '#fff6d0');
     stat('eaten'); if (it.c === 'meal') stat('meals'); if (item === 'herbal_tea' || item === 'berry_tea' || item === 'cider' || item === 'honey_milk') stat('teas');
     sfx('eat');
