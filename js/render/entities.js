@@ -2,6 +2,7 @@
 // Локальная система: +x — вперёд, y — вбок, высота в пикселях; размеры по земле в пикселях делятся на KX.
 import { box, blob, cyl, cone, line3, shadow, KX } from '../core/iso.js';
 import { shade } from '../core/util.js';
+import { drawEmoji } from '../core/emoji.js';
 import { HUNGRY } from '../data/pets.js';
 import { worldToScreen, cam } from './camera.js';
 
@@ -120,7 +121,7 @@ export function drawPetBubble(c, pet, t) {
   const [X, Y0] = worldToScreen(pet.x, pet.y, pet.sleep ? 22 : 30), k = Math.max(.8, cam.zoom), y = Y0 + Math.sin(t * 3) * 1.8;
   c.save(); c.fillStyle = 'rgba(255,250,240,.94)'; c.strokeStyle = 'rgba(120,90,60,.35)'; c.lineWidth = 1;
   c.beginPath(); c.arc(X, y, 9 * k, 0, 7); c.fill(); c.stroke();
-  c.font = `${11 * k}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#000'; c.fillText(ic, X, y + 1); c.restore();
+  drawEmoji(c, ic, X, y + .5, 13 * k); c.restore();
 }
 export function drawZ(c, e, t, z0 = 22) {
   const [X, Y] = worldToScreen(e.x, e.y, z0), k = Math.max(.8, cam.zoom);
@@ -129,7 +130,7 @@ export function drawZ(c, e, t, z0 = 22) {
 }
 export function drawGift(c, n, t) {
   const [X, Y] = worldToScreen(n.x, n.y, 50), k = Math.max(.8, cam.zoom);
-  c.save(); c.font = `${14 * k}px sans-serif`; c.textAlign = 'center'; c.fillText('🎁', X, Y + Math.sin(t * 3) * 2); c.restore();
+  drawEmoji(c, '🎁', X, Y + Math.sin(t * 3) * 2, 17 * k);
 }
 // Индикатор прогресса действия над персонажем
 export function drawWorkRing(c, p) {

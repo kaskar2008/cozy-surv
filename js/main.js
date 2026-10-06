@@ -28,6 +28,7 @@ import { initInput, updateInput } from './input.js';
 import { UI } from './ui/state.js';
 import * as api from './game/api.js';
 import * as skills from './game/skills.js';
+import { initEmoji, preloadEmoji } from './core/emoji.js';
 import { prof, mark, now, hooks } from './core/prof.js';
 
 const canvas = document.getElementById('game'), overlay = document.getElementById('overlay'), ctx = overlay.getContext('2d');
@@ -85,6 +86,8 @@ async function boot() {
   if (src.raw && load(src.raw)) { /* продолжаем */ } else { newGame(); fresh = true; }
   const picker = fresh && src.picker;
   ensureLinks(); computeCozy();
+  await Promise.race([preloadEmoji(), new Promise((r) => setTimeout(r, 3000))]);   // значки готовы до первого кадра, но медленная сеть игру не держит
+  initEmoji();
   initUI(); buildHUD(); buildBar(); initPanel(); initInput(canvas);
   centerOn(G.player.x, G.player.y); cam.zoom = innerWidth < 700 ? 0.8 : 1.05;
   G.speed = G.speed ?? 1; if (G.speed === 0 && !fresh) G.speed = 1;

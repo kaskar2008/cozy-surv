@@ -32,6 +32,7 @@ small { color: var(--ink2); font-size: 12px; }
 .speed { display: flex; border-radius: 14px; overflow: hidden; }
 .speed button { border: 0; border-radius: 0; background: transparent; padding: 7px 10px; }
 .speed button.on { background: var(--accent2); }
+.speed-m, #more-btn, #more-menu { display: none; } #tb-day .sh { display: none; }
 #needs { cursor: pointer; position: absolute; top: 62px; left: 10px; padding: 10px 12px; border-radius: 16px; display: flex; flex-direction: column; gap: 7px; width: 150px; }
 .need { display: flex; align-items: center; gap: 8px; }
 .need .ic { width: 20px; text-align: center; font-size: 16px; }
@@ -94,7 +95,7 @@ small { color: var(--ink2); font-size: 12px; }
 .card .cost { font-size: 12px; display: flex; flex-wrap: wrap; justify-content: center; gap: 1px 5px; color: var(--ink2); min-height: 16px; } .card .cost .miss { color: var(--red); } .card .cost.free { color: var(--green); font-weight: 700; }
 .card.sel { background: #ffe6b8; border-color: #e0903a; box-shadow: 0 0 0 2px #f2b36a; }
 .card .lock { display: none; position: absolute; top: 4px; right: 6px; } .card.locked { opacity: .5; filter: grayscale(.6); } .card.locked .lock { display: block; }
-.card.poor .ico { opacity: .75; }
+.card.poor { border-color: rgba(212, 87, 74, .75); } .card.poor.sel { box-shadow: 0 0 0 2px rgba(212, 87, 74, .45); } .card.poor .ico { opacity: .75; }   /* не хватает ресурсов — красная рамка */
 #tooltip { position: fixed; z-index: 50; display: none; max-width: 300px; background: rgba(60, 40, 28, .94); color: #fff6e4; padding: 8px 12px; border-radius: 12px; font-size: 13px; pointer-events: none; box-shadow: var(--shadow); line-height: 1.35; }
 #tooltip .tdesc { color: #e8d4b6; margin-top: 3px; } #tooltip .tcost { margin-top: 5px; } #tooltip .miss { color: #ff9a8a; } #tooltip .tlock { color: #ffcf8a; margin-top: 4px; } #tooltip .tnote { color: #b8e0a8; margin-top: 3px; font-size: 12px; } #tooltip small { color: #cdb99a; }
 
@@ -138,25 +139,37 @@ body.touch button, body.touch .card { min-height: 40px; }
 body.touch .speed button { padding: 9px 12px; }
 body.touch #menu-btns button { padding: 8px 11px; }
 @media (max-width: 700px), (max-height: 520px) {
+  /* верх телефона: ряд 1 — время, пауза/скорость, уют, ☰; ряд 2 — кольца потребностей и полоса ресурсов; камера — маленькая группа под ними */
   #topbar { top: 6px; left: 6px; gap: 5px; }
-  .tb-time { padding: 5px 9px; gap: 6px; font-size: 13px; } .speed button { padding: 6px 8px; }
-  #needs { top: 50px; left: 6px; width: auto; flex-direction: row; align-items: center; gap: 9px; padding: 0 9px; height: 40px; box-sizing: border-box; border-radius: 14px; }
-  .need .bar { display: none; } .need { gap: 0; position: relative; } .need .ic { font-size: 20px; width: auto; }
-  .need::after { content: ''; position: absolute; left: 0; right: 0; bottom: -3px; height: 3px; border-radius: 2px; background: var(--c, #8fcf6a); transform-origin: left; transform: scaleX(var(--v, 1)); }
-  #cozybox { top: 50px; left: 172px; width: auto; padding: 0 10px; height: 40px; box-sizing: border-box; display: flex; align-items: center; } #cozybox .bar, .cz-name { display: none; } .cz-top { gap: 6px; }
+  .tb-time { height: 38px; padding: 0 10px; gap: 5px; font-size: 13px; border-radius: 14px; }
+  #tb-season .nm, #tb-day .full { display: none; } #tb-day .sh { display: inline; }
+  .speed { display: none; }
+  .speed-m { display: flex; gap: 5px; }
+  .speed-m button, #more-btn { width: 38px; height: 38px; min-height: 0; padding: 0; border-radius: 13px; font-size: 16px; background: var(--paper); box-shadow: var(--shadow); }
+  .speed-m button.on { background: var(--accent2); }
+  #more-btn { display: block; position: absolute; top: 6px; right: 6px; font-size: 19px; }
+  #more-menu { position: absolute; top: 50px; right: 6px; z-index: 30; grid-template-columns: repeat(3, 74px); gap: 6px; padding: 8px; border-radius: 16px; background: var(--paper); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  #more-menu.open { display: grid; }
+  #more-menu button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px 6px; min-height: 0; } #more-menu i { font-style: normal; font-size: 22px; line-height: 1.1; } #more-menu small { font-size: 11.5px; color: var(--ink); }
+  #needs { top: 50px; left: 6px; width: auto; flex-direction: row; align-items: center; gap: 6px; padding: 0; background: none; border: 0; box-shadow: none; }
+  .need { gap: 0; position: relative; width: 34px; height: 34px; justify-content: center; border-radius: 50%; box-shadow: 0 2px 6px rgba(60, 35, 15, .25); background: conic-gradient(var(--c, #8fcf6a) calc(var(--v, 1) * 360deg), rgba(90, 60, 30, .2) 0); }
+  .need::before { content: ''; position: absolute; inset: 3.5px; border-radius: 50%; background: var(--paper); }
+  .need.low { box-shadow: 0 0 0 2px rgba(212, 87, 74, .65), 0 2px 6px rgba(60, 35, 15, .25); }
+  .need .bar { display: none; } .need .ic { position: relative; z-index: 1; font-size: 17px; width: auto; }
+  #cozybox { top: 6px; left: auto; right: 50px; width: auto; padding: 0 10px; height: 38px; box-sizing: border-box; display: flex; align-items: center; border-radius: 14px; } #cozybox .bar, .cz-name { display: none; } .cz-top { gap: 6px; }
   #goalhint { display: none !important; }
   #rightcol { display: contents; }
-  #menu-btns { position: absolute; right: 6px; top: 50px; flex-direction: column; padding: 3px; } #menu-btns button { font-size: 18px; padding: 6px 7px; }
-  #resbar { position: absolute; left: 6px; right: 56px; top: 98px; max-width: none; font-size: 13px; padding: 5px 10px; gap: 2px 12px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } #resbar .res { flex: 0 0 auto; }
+  #menu-btns { position: absolute; right: 6px; top: 96px; flex-direction: column; padding: 3px; } #menu-btns button { font-size: 18px; padding: 6px 7px; } #menu-btns button:nth-child(n+4) { display: none; }   /* остальное — в ☰ */
+  #resbar { position: absolute; left: 206px; right: 6px; top: 50px; height: 34px; box-sizing: border-box; max-width: none; font-size: 13px; padding: 0 12px; gap: 2px 12px; border-radius: 17px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, #000 82%, transparent); mask-image: linear-gradient(90deg, #000 82%, transparent); } #resbar .res { flex: 0 0 auto; }
   #panel { position: fixed; left: 6px; right: 6px; width: auto; bottom: 150px; max-height: 42vh; z-index: 4; }
   #buildbar { width: calc(100vw - 12px); bottom: 6px; padding: 6px 8px 8px; border-radius: 16px; }
   .card { width: 88px; padding: 6px 4px; } .card .ico { font-size: 26px; } .card .nm { font-size: 11.5px; min-height: 26px; }
   .cat { padding: 4px 9px; font-size: 13px; }
-  #interior-banner { top: 142px; padding: 5px 6px 5px 12px; font-size: 13px; gap: 6px; } #interior-banner button { padding: 4px 9px; font-size: 13px; }
+  #interior-banner { top: 96px; padding: 5px 6px 5px 12px; font-size: 13px; gap: 6px; } #interior-banner button { padding: 4px 9px; font-size: 13px; }
   .modal { max-height: calc(100vh - 16px); border-radius: 18px; } .modal-body { padding: 6px 14px 16px; }
   .tabs { gap: 3px; } .tabs button { padding: 6px 6px; font-size: 13px; }
   .recipes.big .recipe { grid-template-columns: 1fr auto; } .recipes.big .r-in { grid-column: 1; } .ctrl { grid-template-columns: 1fr; }
-  .toast { font-size: 13px; width: 80vw; max-width: 80vw; box-sizing: border-box; } #toasts { top: 150px; }
+  .toast { font-size: 13px; width: 72vw; max-width: 72vw; box-sizing: border-box; } #toasts { top: 96px; }
 }
 
 .bb-handle { position: absolute; top: -27px; left: 50%; transform: translateX(-50%); width: 92px; height: 27px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 15px 15px 0 0; background: var(--paper); border: 1px solid var(--line); border-bottom: 0; box-shadow: 0 -4px 12px rgba(60, 35, 15, .14); touch-action: none; }
@@ -197,3 +210,6 @@ button.link { border: 0; background: transparent; box-shadow: none !important; c
 .sk-eff { margin: 6px 0 2px; padding-left: 18px; font-size: 13px; } .sk-eff li.dim { color: var(--ink2); opacity: .75; }
 .sk-next { display: block; margin-top: 4px; font-size: 12.5px; color: #8a6a2a; }
 small.lock { color: #b0652a; font-weight: 600; }
+
+/* эмодзи-картинки (Twemoji): масштабируются вместе с шрифтом */
+img.em { display: inline-block; width: 1.15em; height: 1.15em; vertical-align: -.2em; pointer-events: none; -webkit-user-drag: none; user-select: none; }

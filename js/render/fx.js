@@ -4,6 +4,7 @@ import { exploredNear } from '../game/fog.js';
 import { cam, worldToScreen, viewTiles } from './camera.js';
 const proj = (x, y, z) => worldToScreen(x, y, z);
 import { rnd, pick } from '../core/util.js';
+import { drawRich } from '../core/emoji.js';
 
 export const fxs = { scope: null };
 export const parts = [];
@@ -45,7 +46,7 @@ export function drawParts(c) {
   for (const f of floats) {
     if (f.sc !== G.scene) continue;
     const [X, Y] = proj(f.x, f.y, f.z), a = Math.min(1, f.life / .6);
-    c.globalAlpha = a; c.lineWidth = 3; c.strokeStyle = 'rgba(40,30,20,.55)'; c.strokeText(f.text, X, Y); c.fillStyle = f.col; c.fillText(f.text, X, Y);
+    c.globalAlpha = a; c.lineWidth = 3; c.strokeStyle = 'rgba(40,30,20,.55)'; c.fillStyle = f.col; drawRich(c, f.text, X, Y, 13 * Math.max(.9, zm), true);
   }
   c.globalAlpha = 1;
 }

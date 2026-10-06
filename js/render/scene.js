@@ -19,6 +19,7 @@ import { workProgress } from '../game/progress.js';
 import { buildConstruction, constructPose } from './construct.js';
 import { mark, now as pnow } from '../core/prof.js';
 import { setOutline, renderOutline } from './outline.js';
+import { drawEmoji } from '../core/emoji.js';
 import { initFogLayer, updateFogLayer } from './fogLayer.js';
 import { explored } from '../game/fog.js';
 
@@ -207,17 +208,6 @@ function drawGrid(c, g) {
   c.stroke();
 }
 
-// Значок-эмодзи рисуется картинкой, а не текстом: при масштабе браузер сдвигает глиф, поэтому центр берём по реальным пикселям
-const BG = 48, glyphs = new Map();
-function badgeGlyph(ic) {
-  let g = glyphs.get(ic); if (g) return g;
-  const cv = document.createElement('canvas'); cv.width = cv.height = BG * 2;
-  const x = cv.getContext('2d', { willReadFrequently: true }); x.font = `${BG}px sans-serif`; x.textAlign = 'center'; x.fillText(ic, BG, BG * 1.4);
-  const d = x.getImageData(0, 0, cv.width, cv.height).data; let x0 = cv.width, x1 = 0, y0 = cv.height, y1 = 0;
-  for (let j = 0; j < cv.height; j++) for (let i = 0; i < cv.width; i++) if (d[(j * cv.width + i) * 4 + 3] > 40) { if (i < x0) x0 = i; if (i > x1) x1 = i; if (j < y0) y0 = j; if (j > y1) y1 = j; }
-  g = { cv, cx: (x0 + x1 + 1) / 2, cy: (y0 + y1 + 1) / 2 }; glyphs.set(ic, g); return g;
-}
-
 function drawOverlays(c, o, t) {
   const zk = Math.max(.75, cam.zoom);
   // связи выделенной постройки
@@ -284,6 +274,6 @@ function drawOverlays(c, o, t) {
     const ic = def.badge(b); if (!ic) continue;
     const [X, Y] = sp(b.x + b.w / 2, b.y + b.d / 2, Math.min(def.h, 70) + 16 + Math.sin(t * 3 + b.id) * 2.5);
     c.fillStyle = 'rgba(255,250,240,.92)'; c.beginPath(); c.arc(X, Y - 4 * zk, 11 * zk, 0, 7); c.fill(); c.strokeStyle = 'rgba(120,90,60,.35)'; c.lineWidth = 1; c.stroke();
-    const gl = badgeGlyph(ic), k = 13 * zk / BG; c.drawImage(gl.cv, X - gl.cx * k, Y - 4 * zk - gl.cy * k, gl.cv.width * k, gl.cv.height * k);
+    drawEmoji(c, ic, X, Y - 4 * zk, 15 * zk);
   }
 }
