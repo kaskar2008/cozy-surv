@@ -170,7 +170,7 @@ export function demolish(b) {
 
 // ---------------------------------------------------------------- сбор ресурсов
 export function hasTool(t) { return eco.has(t, 1); }
-export function toolMsg(t) { return `Нужен инструмент «${itemName(t)}» — сделай его (кнопка ✋ — ручная работа)`; }
+export function toolMsg(t) { return `Нужен инструмент «${itemName(t)}» — сделай его (кнопка 🛠️ — крафт)`; }
 
 function rollGive(give) {
   const out = {};
@@ -207,7 +207,7 @@ export function gatherNode(n) {
 
 // ---------------------------------------------------------------- вода, рыбалка
 export function fishFrom(wx, wy) {
-  if (!hasTool('rod')) { toast('Нужна удочка — сделай её в ручной работе (кнопка ✋)', 'warn'); return; }
+  if (!hasTool('rod')) { toast('Нужна удочка — сделай её в крафте (кнопка 🛠️)', 'warn'); return; }
   // ближайшая клетка суши рядом с точкой воды
   let best = null, bd = 1e9;
   for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const x = wx + dx, y = wy + dy; if (!inB(x, y) || G.blk[ti(x, y)]) continue; const dd = Math.hypot(dx, dy); if (dd < bd && nearWater(x, y, 1)) { bd = dd; best = [x, y]; } }
@@ -227,7 +227,7 @@ export function fishFrom(wx, wy) {
   });
 }
 export function fetchWaterNatural(wx, wy) {
-  if (!hasTool('bucket')) { toast('Нужно ведро — сделай его в ручной работе (кнопка ✋)', 'warn'); return; }
+  if (!hasTool('bucket')) { toast('Нужно ведро — сделай его в крафте (кнопка 🛠️)', 'warn'); return; }
   if (eco.space('water') <= 0) { toast('Вёдра уже полные', 'warn'); return; }
   let best = null, bd = 1e9;
   for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const x = wx + dx, y = wy + dy; if (!inB(x, y) || G.blk[ti(x, y)]) continue; const dd = Math.hypot(dx, dy); if (dd < bd && nearWater(x, y, 1)) { bd = dd; best = [x, y]; } }
@@ -316,6 +316,10 @@ export function takeCompost(b) {
   if (!b.st.ready) { toast('Компост ещё не созрел'); return; }
   doAt(b, 'Забираю компост', 1, 'pick', () => { const a = eco.add('compost', b.st.ready); b.st.ready -= a; fx.floatText(b.x + .5, b.y + .5, `+${a}🟤`, '#fff', 30); });
 }
+// компост рядом с грядкой (зазор между постройками до 3 клеток): сам удобряет посевы
+const gap = (a, b) => Math.hypot(Math.max(a.x - (b.x + b.w), b.x - (a.x + a.w), 0), Math.max(a.y - (b.y + b.d), b.y - (a.y + a.d), 0));
+export function compostsNear(b) { const out = []; for (const o of G.bMap.values()) if (BDEF[o.t].compost && gap(o, b) <= 3) out.push(o); return out; }
+export function cropsNear(b) { const out = []; for (const o of G.bMap.values()) if (BDEF[o.t].crops && gap(o, b) <= 3) out.push(o); return out; }
 // грядки
 export function plantCrop(b, plotIdx, crop) {
   const c = CROPS[crop], p = b.st.plots[plotIdx];
@@ -325,8 +329,6 @@ export function plantCrop(b, plotIdx, crop) {
   doAt(b, 'Сажаю', 2, 'pick', () => {
     if (!eco.take(c.seed, 1)) return;
     p.crop = crop; p.prog = 0; p.moist = Math.max(p.moist, .5); p.fert = 0;
-    // автоудобрение от компоста рядом
-    for (const o of G.bMap.values()) if (BDEF[o.t].compost && o.st.ready > 0 && Math.hypot(o.x - b.x, o.y - b.y) <= 3.5) { o.st.ready--; p.fert = 1; fx.floatText(b.x + 1, b.y + 1, 'Удобрено 🟤', '#cfe8a0', 40); break; }
     stat('planted'); sfx('pick');
   });
 }
@@ -532,6 +534,8 @@ export function linksOf(b) {
     const comp = G.comp?.[type]?.get(b.id);
     if (comp) for (const o of b.nb) if (G.comp[type].get(o.id) === comp) add(o, type === 'water' ? '#6cc4ee' : '#ffd36e');
   }
+  if (def.crops) for (const o of compostsNear(b)) add(o, '#9bc46a');
+  if (def.compost) for (const o of cropsNear(b)) add(o, '#9bc46a');
   for (const o of b.nb) {
     const od = BDEF[o.t];
     if (def.needs?.includes('heat') && isHot(o)) add(o, '#ff9a50');

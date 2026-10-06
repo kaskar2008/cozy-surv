@@ -2,7 +2,7 @@
 // heat: станция должна стоять рядом с горящим огнём; в `in` вода берётся из сети труб (если станция подключена) или из инвентаря.
 const R = (out, inn, t, extra = {}) => ({ out, in: inn, t, ...extra });
 export const STATIONS = {
-  hand: { name: 'Ручная работа', icon: '✋', recipes: [
+  hand: { name: 'Крафт', icon: '🛠️', recipes: [
     R({ rope: 1 }, { fiber: 3 }, 3),
     R({ pickaxe: 1 }, { sticks: 3, stone: 3, fiber: 2 }, 4, { once: true }),
     R({ rod: 1 }, { sticks: 4, fiber: 3 }, 4, { once: true }),

@@ -40,7 +40,7 @@ export function buildHUD() {
     h('div', { id: 'menu-btns' },
       h('button', { title: 'К персонажу (Пробел)', onclick: centerPlayer }, '🎯'),
       h('button', { title: 'Рюкзак (I)', onclick: openInventory }, '🎒'),
-      h('button', { title: 'Ручная работа (C)', onclick: openCraft }, '✋'),
+      h('button', { title: 'Крафт (C)', onclick: openCraft }, '🛠️'),
       h('button', { title: 'Журнал: цели, уют, рецепты (J)', onclick: () => openJournal('goals') }, '📖'),
       h('button', { title: 'Сфотографировать (F)', onclick: takePhoto }, '📷'),
       h('button', { id: 'mute-btn', title: 'Звук (M)', onclick: () => { initAudio(); setMuted(!isMuted()); syncMute(); } }, '🔊'),

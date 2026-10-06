@@ -1,6 +1,6 @@
 // Глобальное состояние игры и время.
 export const N = 56;            // размер острова в клетках
-export const DAY = 300;         // секунд в игровых сутках (при скорости x1)
+export const DAY = 480;         // секунд в игровых сутках (при скорости x1)
 export const SEASON_DAYS = 6;
 export const G = {};
 

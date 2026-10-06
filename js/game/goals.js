@@ -27,7 +27,7 @@ export const GOALS = [
   { id: 'lights', ic: '🕯️', name: 'Огоньки вечера', desc: 'Поставь три источника света: факелы, фонари или костры.', ok: () => [...G.bMap.values()].filter((b) => BDEF[b.t].light).length >= 3, reward: { wax: 2 } },
   { id: 'eggs', ic: '🥚', name: 'Свежие яйца', desc: 'Построй курятник, накорми и напои кур — и собери яйца.', ok: () => st('eggs') >= 1, reward: { feather: 2 } },
   { id: 'honey', ic: '🍯', name: 'Сладкая жизнь', desc: 'Улей и цветы рядом — мёд не заставит себя ждать.', ok: () => st('honey') >= 1, reward: { wax: 2 } },
-  { id: 'fish', ic: '🎣', name: 'Рыбацкая удача', desc: 'Сделай удочку (кнопка ✋ — ручная работа) и поймай 3 рыбы.', ok: () => st('fish') >= 3, reward: { rope: 2 } },
+  { id: 'fish', ic: '🎣', name: 'Рыбацкая удача', desc: 'Сделай удочку (кнопка 🛠️ — крафт) и поймай 3 рыбы.', ok: () => st('fish') >= 3, reward: { rope: 2 } },
   { id: 'bread', ic: '🍞', name: 'Запах хлеба', desc: 'Пшеница → жернова → мука → печь. Испеки хлеб.', ok: () => !!(G.stats.cookedItems || {}).bread, reward: { honey: 2 } },
   { id: 'pie', ic: '🥧', name: 'Пирог на столе', desc: 'Испеки яблочный или ягодный пирог.', ok: () => !!((G.stats.cookedItems || {}).apple_pie || (G.stats.cookedItems || {}).berry_pie), reward: { seed_strawberry: 3 } },
   { id: 'sprinkler', ic: '💦', name: 'Автополив', desc: 'Проведи трубы и поставь дождеватель рядом с грядками.', ok: () => anyB((b) => b.t === 'sprinkler' && G.comp.water.get(b.id) && S.netOf(b, 'water').stock > 0), reward: { scrap: 3 } },

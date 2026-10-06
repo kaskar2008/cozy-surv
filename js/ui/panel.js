@@ -11,6 +11,7 @@ import * as eco from '../game/eco.js';
 import * as api from '../game/api.js';
 import { S, bldName, defOf, linksOf, refundOf, canCraft, stationHeatOk, waterAvailable } from '../game/api.js';
 import { netOf, isHot, heated } from '../game/nets.js';
+import { workProgress } from '../game/progress.js';
 import { enterHome, furnActions, removeFurn, proxyOf, homeOf } from '../game/interior.js';
 import { R } from '../render/scene.js';
 import { focusUpper } from '../render/camera.js';
@@ -43,8 +44,9 @@ function recipesUI(holder, stationKey, def) {
     const name = r.name || Object.keys(r.out).map((k) => ITEMS[k].n).join(', ');
     const have = (k, n) => (k === 'water' && st.water) ? (waterAvailable(holder) + eco.count('water') >= n) : eco.count(k) >= n;
     const can = canCraft(holder, stationKey, r) && !(r.once && Object.keys(r.out).every((k) => eco.has(k)));
-    const row = h('div', { class: 'recipe' + (can ? '' : ' off') },
-      h('div', { class: 'r-out' }, h('span', { class: 'big' }, itemIcon(Object.keys(r.out)[0])), h('div', null, h('b', null, name + (Object.values(r.out)[0] > 1 ? ` ×${Object.values(r.out)[0]}` : '')), h('small', null, `⏱ ${r.t} с`))),
+    const busy = !!cur && cur.st === stationKey && cur.idx === idx;
+    const row = h('div', { class: 'recipe' + (can || busy ? '' : ' off') + (busy ? ' cooking' : ''), style: busy ? `--p:${(100 * (1 - cur.left / cur.total)).toFixed(1)}%` : null },
+      h('div', { class: 'r-out' }, h('span', { class: 'big' }, itemIcon(Object.keys(r.out)[0])), h('div', null, h('b', null, name + (Object.values(r.out)[0] > 1 ? ` ×${Object.values(r.out)[0]}` : '')), h('small', null, `⏱ ${r.t} с`), busy && holder.st.q > 0 ? h('small', { class: 'qleft' }, `Осталось: ${holder.st.q + 1}`) : null)),
       h('div', { class: 'r-in' }, ...Object.entries(r.in).map(([k, n]) => h('span', { class: 'chip ' + (have(k, n) ? '' : 'miss') }, `${n}${itemIcon(k)}`))),
       h('div', { class: 'r-btn' }, h('button', { disabled: !!cur || !can, onclick: () => { api.startCraft(holder, stationKey, idx, 1); renderPanel(true); } }, 'Сделать'), r.once ? null : h('button', { class: 'sm', disabled: !!cur || !can, title: 'Поставить в очередь ×3', onclick: () => { api.startCraft(holder, stationKey, idx, 3); renderPanel(true); } }, '×3')));
     wrap.append(row);
@@ -106,7 +108,7 @@ function describeBld(b) {
   if (def.compost) {
     lines.push(`🟤 Загружено: ${st.load} · готово: ${st.ready}/6`);
     A('♻️ Заложить (2 волокна/травы)', () => api.loadCompost(b)); if (st.ready > 0) A(`🟤 Забрать компост (${st.ready})`, () => api.takeCompost(b));
-    lines.push('Грядки в 3 клетках сами берут готовый компост при посадке.');
+    { const n = api.cropsNear(b).length; lines.push(n ? `🥕 Грядок рядом: ${n} — удобряет их сам` : 'Грядки в 3 клетках сами берут готовый компост.'); }
   }
   if (def.crops) {
     const gh = def.tags.includes('greenhouse');
@@ -127,6 +129,7 @@ function describeBld(b) {
       }
     });
     if (G.comp.water.has(b.id)) lines.push('💧 Подключено к трубам: поливается само');
+    { const cs = api.compostsNear(b); lines.push(cs.length ? `🟤 Компост рядом (${cs.length}): сам удобрит посевы, когда созреет` : '💡 Компостная куча в 3 клетках сама удобряет посевы'); }
   }
   if (def.sit) A(`${def.sit.label || '🪑 Посидеть'} (+${def.sit.mood}😊)`, () => api.sitAt(b));
   if (def.nap) A('😴 Вздремнуть', () => api.napAt(b));
@@ -147,7 +150,7 @@ function describeWater(sel) {
   acts.push({ label: '🎣 Рыбачить', run: () => api.fishFrom(sel.x, sel.y), sub: eco.has('rod') ? '' : 'нужна удочка' });
   acts.push({ label: '🪣 Набрать ведро воды', run: () => api.fetchWaterNatural(sel.x, sel.y) });
   acts.push({ label: '💧 Напиться', run: () => api.drinkNatural(sel.x, sel.y) });
-  return { icon: '🌊', title: 'Водоём', desc: 'Вода у берега. Здесь можно рыбачить (удочка в «ручной работе» — C), набирать воду ведром и пить. Причал рядом ускоряет рыбалку.', lines: [], bars: [], acts };
+  return { icon: '🌊', title: 'Водоём', desc: 'Вода у берега. Здесь можно рыбачить (удочка в «Крафте» — C), набирать воду ведром и пить. Причал рядом ускоряет рыбалку.', lines: [], bars: [], acts };
 }
 function describeFurn(sel) {
   const home = homeOf(); if (!home) return null;
@@ -173,6 +176,7 @@ export function renderPanel(force) {
   else if (sel.kind === 'water') m = describeWater(sel);
   else if (sel.kind === 'furn') m = describeFurn(sel);
   if (!m) { clearSelection(); return; }
+  if (m.station) { const pr = workProgress(m.station.holder, { station: m.station.key }); const row = root.querySelector('.recipe.cooking'); if (pr && row) row.style.setProperty('--p', (100 * pr.p).toFixed(1) + '%'); }
   const sig = JSON.stringify([m.title, m.lines, m.bars, m.acts.map((a) => [a.label, a.off, a.sub]), m.station && m.station.holder.st.cur ? [m.station.holder.st.cur.left | 0, m.station.holder.st.q] : null, m.station ? Object.keys(G.inv).map((k) => G.inv[k]).join() : '', m.links ? m.links.length : 0]);
   if (!force && sig === sigLast) return;
   sigLast = sig;

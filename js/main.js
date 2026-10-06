@@ -1,5 +1,5 @@
 // Точка входа: инициализация, главный цикл, автосохранение.
-import { G, N, darkness } from './game/state.js';
+import { G, N, darkness, season } from './game/state.js';
 import { newGame } from './game/init.js';
 import { load, save, hasSave, wipe } from './game/save.js';
 import { cam, centerOn } from './render/camera.js';
@@ -60,7 +60,7 @@ function frame(ts) {
     audioT -= rdt;
     if (audioT <= 0) {
       audioT = .5; const p = G.player;
-      G.audioSt = { rain: G.wx.rain, night: darkness() > .55, fire: G.scene === 'world' ? Math.min(1, nearHeat(p.x, p.y, 7) * 2.2) : (G.interior?.heat ? .8 : 0), season: Math.floor(G.t / 300 / 6) % 4, indoor: G.scene !== 'world', chime: [...G.bMap.values()].some((b) => b.t === 'windchime') };
+      G.audioSt = { rain: G.wx.rain, night: darkness() > .55, fire: G.scene === 'world' ? Math.min(1, nearHeat(p.x, p.y, 7) * 2.2) : (G.interior?.heat ? .8 : 0), season: season(), indoor: G.scene !== 'world', chime: [...G.bMap.values()].some((b) => b.t === 'windchime') };
     }
     if (G.audioSt) audio.ambient(rdt, G.audioSt);
   } catch (e) { console.error(e); }

@@ -13,6 +13,7 @@ import { drawParts, drawAmbient } from './fx.js';
 import { drawLighting } from './lighting.js';
 import { drawWeather } from './weather.js';
 import { isHot } from '../game/nets.js';
+import { workProgress } from '../game/progress.js';
 import { mark, now as pnow } from '../core/prof.js';
 
 // Состояние отрисовки, которое задают ввод и UI
@@ -110,6 +111,17 @@ function drawGrid(c, g) {
   c.stroke();
 }
 
+// Значок-эмодзи рисуется картинкой, а не текстом: при масштабе браузер сдвигает глиф, поэтому центр берём по реальным пикселям
+const BG = 48, glyphs = new Map();
+function badgeGlyph(ic) {
+  let g = glyphs.get(ic); if (g) return g;
+  const cv = document.createElement('canvas'); cv.width = cv.height = BG * 2;
+  const x = cv.getContext('2d', { willReadFrequently: true }); x.font = `${BG}px sans-serif`; x.textAlign = 'center'; x.fillText(ic, BG, BG * 1.4);
+  const d = x.getImageData(0, 0, cv.width, cv.height).data; let x0 = cv.width, x1 = 0, y0 = cv.height, y1 = 0;
+  for (let j = 0; j < cv.height; j++) for (let i = 0; i < cv.width; i++) if (d[(j * cv.width + i) * 4 + 3] > 40) { if (i < x0) x0 = i; if (i > x1) x1 = i; if (j < y0) y0 = j; if (j > y1) y1 = j; }
+  g = { cv, cx: (x0 + x1 + 1) / 2, cy: (y0 + y1 + 1) / 2 }; glyphs.set(ic, g); return g;
+}
+
 function drawOverlays(c, o, t) {
   // связи выделенной постройки
   if (R.links.length) {
@@ -161,14 +173,21 @@ function drawOverlays(c, o, t) {
     if (g.radius) { const [X, Y] = proj(g.x + g.w / 2, g.y + g.d / 2, 0); c.strokeStyle = 'rgba(255,255,255,.5)'; c.setLineDash([4, 5]); c.lineWidth = 1.6; c.beginPath(); c.ellipse(X, Y, g.radius * 45.25, g.radius * 22.6, 0, 0, 7); c.stroke(); c.setLineDash([]); }
   }
   if (G.scene === 'world') drawWorkRing(c, G.player);
-  // значки состояния над постройками
+  // значки состояния и мини-прогресс процессов над постройками
   c.textAlign = 'center'; c.font = '14px sans-serif';
   for (const b of G.bMap.values()) {
-    const def = BDEF[b.t]; if (!def.badge) continue;
+    const def = BDEF[b.t];
+    const pr = workProgress(b, def);
+    if (pr) {
+      const [X, Y] = proj(b.x + b.w / 2, b.y + b.d / 2, Math.min(def.h, 70) + 6), w = 30, hh = 6;
+      c.fillStyle = 'rgba(60,40,25,.55)'; c.beginPath(); c.roundRect(X - w / 2 - 1.5, Y - hh / 2 - 1.5, w + 3, hh + 3, 4); c.fill();
+      c.fillStyle = pr.paused ? '#a09888' : pr.col; c.beginPath(); c.roundRect(X - w / 2, Y - hh / 2, Math.max(hh, w * pr.p), hh, 3); c.fill();
+    }
+    if (!def.badge) continue;
     const ic = def.badge(b); if (!ic) continue;
     const [X, Y] = proj(b.x + b.w / 2, b.y + b.d / 2, Math.min(def.h, 70) + 16 + Math.sin(t * 3 + b.id) * 2.5);
     c.fillStyle = 'rgba(255,250,240,.92)'; c.beginPath(); c.arc(X, Y - 4, 11, 0, 7); c.fill(); c.strokeStyle = 'rgba(120,90,60,.35)'; c.lineWidth = 1; c.stroke();
-    c.fillStyle = '#000'; c.fillText(ic, X, Y + 1);
+    const g = badgeGlyph(ic), k = 13 / BG; c.drawImage(g.cv, X - g.cx * k, Y - 4 - g.cy * k, g.cv.width * k, g.cv.height * k);
   }
   // ресурсы, готовые к сбору
   for (const n of G.nodeMap.values()) if (n.t === 'appletree' && n.fruit && n.st === 'full') { /* яблоки видны на спрайте */ }

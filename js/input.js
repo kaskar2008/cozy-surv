@@ -1,6 +1,6 @@
 // Ввод: мышь, клавиатура, камера, призрак постройки, фотографии.
 import { UI } from './ui/state.js';
-import { G, N } from './game/state.js';
+import { G, N, day } from './game/state.js';
 import { cam, screenToWorld, worldToScreen, zoomAt, centerOn } from './render/camera.js';
 import { R } from './render/scene.js';
 import { BDEF } from './data/buildings/index.js';
@@ -12,7 +12,7 @@ import * as api from './game/api.js';
 import * as eco from './game/eco.js';
 import * as pl from './game/player.js';
 import { maskFor } from './game/nets.js';
-import { homeOf, enterHome, ghostAt, pickInterior, placeFurn } from './game/interior.js';
+import { homeOf, enterHome, exitHome, doorOf, ghostAt, pickInterior, placeFurn } from './game/interior.js';
 import { selectBuilding, selectWater, selectFurn, clearSelection } from './ui/panel.js';
 import { setTool, cancelBuild, toggleBar, updateCards, renderBar } from './ui/buildbar.js';
 import { closeModal, showTip, hideTip, toast } from './ui/ui.js';
@@ -53,7 +53,6 @@ function onWheel(e) {
   // тачпад шлёт мелкие дробные дельты и часто deltaX; колесо мыши — крупные «ступеньки» только по Y
   if (!e.ctrlKey && e.deltaMode === 0 && (e.deltaX !== 0 || Math.abs(e.deltaY) < 40 || (e.deltaY % 1 !== 0))) padUntil = now + 300;
   if (e.ctrlKey || now >= padUntil) { zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0012))); return; }
-  if (inside()) return;
   cam.goto = null; cam.x += e.deltaX / cam.zoom; cam.y += e.deltaY / cam.zoom; clampCam();
 }
 const inside = () => G.scene !== 'world';
@@ -117,7 +116,7 @@ function onMove(e) {
     if (gesture && pointers.size >= 2) {
       const m = mid();
       zoomAt(m.x, m.y, m.d / gesture.d);
-      if (!inside()) { cam.x -= (m.x - gesture.x) / cam.zoom; cam.y -= (m.y - gesture.y) / cam.zoom; clampCam(); }
+      cam.x -= (m.x - gesture.x) / cam.zoom; cam.y -= (m.y - gesture.y) / cam.zoom; clampCam();
       gesture = { d: m.d, x: m.x, y: m.y };
       return;
     }
@@ -130,7 +129,7 @@ function onMove(e) {
   if (drag) {
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (Math.abs(dx) + Math.abs(dy) > (drag.touch ? 9 : 4)) drag.moved = true;
-    if (drag.moved && !inside()) { cam.x = drag.cx - dx / cam.zoom; cam.y = drag.cy - dy / cam.zoom; clampCam(); }
+    if (drag.moved) { cam.x = drag.cx - dx / cam.zoom; cam.y = drag.cy - dy / cam.zoom; clampCam(); }
     return;
   }
   if (placing) {
@@ -191,7 +190,11 @@ function onKey(e) {
   }
 }
 function clampCam() {
-  if (inside()) return;
+  if (inside()) {   // внутри дома камера гуляет в пределах комнаты (на телефоне она может не помещаться целиком)
+    const h = homeOf(); if (!h) return;
+    cam.x = Math.max(-h.in.d * HW - 40, Math.min(h.in.w * HW + 40, cam.x)); cam.y = Math.max(-200, Math.min((h.in.w + h.in.d) * HH + 60, cam.y));
+    return;
+  }
   cam.x = Math.max(-N * HW * .9, Math.min(N * HW * .9, cam.x)); cam.y = Math.max(0, Math.min(N * 2 * HH, cam.y));
 }
 
@@ -293,7 +296,7 @@ function clickInterior(mx, my, dbl) {
   if (r?.it) { selectFurn(r.it); return; }
   // ковры и спальник лежат на полу: спальник выбирается сразу, остальное — двойным нажатием (иначе по ним неудобно ходить)
   if (r?.flat && (FDEF[r.flat.t].sleep || dbl)) { selectFurn(r.flat); return; }
-  if (r?.tile) { clearSelection(); pl.goTo(r.tile[0], r.tile[1]); }
+  if (r?.tile) { clearSelection(); const door = doorOf(home), isDoor = r.tile[0] === door.x && r.tile[1] === door.y; pl.goTo(r.tile[0], r.tile[1], isDoor ? exitHome : undefined); }   // нажатие на клетку двери — выйти из дома
 }
 
 // ---------------------------------------------------------------- обновление
@@ -338,7 +341,7 @@ export function takePhoto() {
     canvas.toBlob((blob) => {
       ui.style.visibility = '';
       if (!blob) return;
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `ostrov-den-${Math.floor(G.t / 300) + 1}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `ostrov-den-${day() + 1}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
       api.stat('photos'); toast('📷 Снимок сохранён в загрузки', 'goal');
       const fl = document.getElementById('flash'); fl.classList.add('on'); setTimeout(() => fl.classList.remove('on'), 160);
     });

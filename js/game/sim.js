@@ -4,7 +4,8 @@ import { T, inB, ti, nodeAt, addNode, removeNode, removeBld } from './world.js';
 import * as eco from './eco.js';
 import { netOf, netAdd, netTake, isHot, heated, ensureLinks } from './nets.js';
 import { updatePlayer } from './player.js';
-import { S, toast, stat, stationHeatOk, canCraft, flowersNear, addBuff, buffSum, wakeUp, nearHeat } from './api.js';
+import { COMPOST_T, MILL_T } from './progress.js';
+import { compostsNear, S, toast, stat, stationHeatOk, canCraft, flowersNear, addBuff, buffSum, wakeUp, nearHeat } from './api.js';
 import { BDEF } from '../data/buildings/index.js';
 import { STATIONS } from '../data/recipes.js';
 import { CROPS, growMult, SEASONS } from '../data/crops.js';
@@ -198,7 +199,9 @@ function updateCrops(b, def, dt) {
   b._sc = (b._sc || 0) - dt;
   if (b._sc <= 0) { b._sc = 4; b._scare = 1; for (const o of G.bMap.values()) if (BDEF[o.t].tags.includes('scarecrow') && Math.hypot(o.x - b.x, o.y - b.y) <= 4.5) { b._scare = 1.1; break; } }
   const wet = G.comp.water.has(b.id);
+  if (b._cc === undefined || (b._cc -= dt) <= 0) { b._cc = 3; b._comp = compostsNear(b); }
   for (const p of b.st.plots) {
+    if (p.crop && !p.fert && b._comp.length) { const o = b._comp.find((c) => G.bMap.get(c.id) === c && c.st.ready > 0); if (o) { o.st.ready--; p.fert = 1; fx.floatText(b.x + b.w / 2, b.y + b.d / 2, 'Удобрено 🟤', '#cfe8a0', 40); fx.sparkle(b.x + b.w / 2, b.y + b.d / 2, 14, '#cfe8a0'); } }
     if (!p.crop) { p.moist = Math.max(0, p.moist - dt * .0008); continue; }
     if (rainy && !gh) p.moist = Math.min(1, p.moist + dt * .03);
     p.moist = Math.max(0, p.moist - dt * .0024 / (def.bonus ? 1.15 : 1) * (s === 1 ? 1.3 : 1));
@@ -237,10 +240,10 @@ const UPD = {
   },
   windmill(b, def, dt) {
     const w = G.weather.type, wind = w === 'rain' ? .7 : w === 'fog' ? .4 : w === 'snow' ? .5 : 1;
-    if (!b.st.off && eco.has('wheat', 3) && eco.space('flour') >= 2) { b.st.prog = (b.st.prog || 0) + dt * wind; b.st.on = true; if (b.st.prog >= 12) { b.st.prog = 0; eco.take('wheat', 3); eco.add('flour', 2); fx.floatText(b.x + 1, b.y + 1, '+2🧂', '#fff6d0', 70); stat('milled'); } }
+    if (!b.st.off && eco.has('wheat', 3) && eco.space('flour') >= 2) { b.st.prog = (b.st.prog || 0) + dt * wind; b.st.on = true; if (b.st.prog >= MILL_T) { b.st.prog = 0; eco.take('wheat', 3); eco.add('flour', 2); fx.floatText(b.x + 1, b.y + 1, '+2🧂', '#fff6d0', 70); stat('milled'); } }
     else b.st.on = !b.st.off && (b.st.on && Math.random() > dt * .5);
   },
-  compost(b, def, dt) { if (b.st.load > 0) { b.st.t += dt; if (b.st.t >= 70) { b.st.t = 0; b.st.load--; b.st.ready = Math.min(6, b.st.ready + 1); } } },
+  compost(b, def, dt) { if (b.st.load > 0) { b.st.t += dt; if (b.st.t >= COMPOST_T) { b.st.t = 0; b.st.load--; b.st.ready = Math.min(6, b.st.ready + 1); } } },
   chimney(b, def, dt) { if (b.nb.some((o) => BDEF[o.t].home && o.st.fireOn) && Math.random() < dt * 2) fx.smoke(b.x + .5, b.y + .5, 90); },
   home(b, def, dt) {
     b.st.glow = G.scene === b.id || !!b.st.lampOn;

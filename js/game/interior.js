@@ -23,7 +23,7 @@ import { updateStation } from './sim.js';
 
 S.furnDef = (id) => FDEF[id];
 export const homeOf = () => (G.scene === 'world' ? null : G.bMap.get(G.scene) || null);
-const doorOf = (b) => ({ x: b.in.w - 1, y: b.in.d - 1 });
+export const doorOf = (b) => ({ x: b.in.w - 1, y: b.in.d - 1 });
 
 // ---------------------------------------------------------------- состояние комнаты
 export function proxyOf(home, it) {

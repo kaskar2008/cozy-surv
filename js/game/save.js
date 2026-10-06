@@ -1,5 +1,5 @@
 // Сохранение в localStorage.
-import { G, N } from './state.js';
+import { G, N, DAY } from './state.js';
 import { rebuildOcc } from './world.js';
 
 const KEY = 'cozy-island-save-v1';
@@ -12,7 +12,7 @@ export function hasSave() { try { return !!localStorage.getItem(KEY); } catch (e
 export function save() {
   try {
     const data = {
-      ver: 1, seed: G.seed, t: G.t, inv: G.inv, needs: G.needs, buffs: G.buffs, weather: G.weather, wx: G.wx, sky: { rainbow: G.sky.rainbow, aurora: G.sky.aurora, star: null },
+      ver: 1, dayLen: DAY, seed: G.seed, t: G.t, inv: G.inv, needs: G.needs, buffs: G.buffs, weather: G.weather, wx: G.wx, sky: { rainbow: G.sky.rainbow, aurora: G.sky.aurora, star: null },
       stats: G.stats, goals: G.goals, flags: G.flags, built: G.built, pets: G.pets, mail: G.mail, uid: G.uid, nid: G.nid, bid: G.bid, speed: G.speed,
       tiles: b64(G.tiles), shd: b64(G.shd), det: b64(G.det),
       nodes: [...G.nodeMap.values()], blds: [...G.bMap.values()],
@@ -29,7 +29,7 @@ export function load() {
     const d = JSON.parse(raw);
     for (const k of Object.keys(G)) delete G[k];
     Object.assign(G, {
-      ver: d.ver, seed: d.seed, N, t: d.t, inv: d.inv, capBonus: {}, needs: d.needs, buffs: d.buffs || [], weather: d.weather, wx: d.wx || { rain: 0, snow: 0, fog: 0, cloud: 0 }, sky: { rainbow: 0, aurora: 0, star: null, ...(d.sky || {}), star: null },
+      ver: d.ver, seed: d.seed, N, t: d.t * DAY / (d.dayLen || 300), inv: d.inv, capBonus: {}, needs: d.needs, buffs: d.buffs || [], weather: d.weather, wx: d.wx || { rain: 0, snow: 0, fog: 0, cloud: 0 }, sky: { rainbow: 0, aurora: 0, star: null, ...(d.sky || {}), star: null },
       stats: d.stats || {}, goals: d.goals || {}, flags: d.flags || {}, built: d.built || {}, pets: d.pets || [], npc: null, mail: d.mail || [], uid: d.uid || 1, scene: 'world', speed: d.speed ?? 1,
       cozy: { total: 0, out: 0, inn: 0, list: [] },
       player: { ...d.player, path: [], work: null, fx: null, sleeping: false, moving: false },
