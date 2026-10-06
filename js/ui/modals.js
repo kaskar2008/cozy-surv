@@ -205,15 +205,7 @@ export function openJournal(tab = 'goals', focus) {
     } else if (t === 'recipes') {
       content.append(...recipesView());
     } else {
-      content.append(h('h3', null, 'Управление'), h('div', { class: 'ctrl' }, ...(isTouch() ? CONTROLS_TOUCH : CONTROLS_PC).map(([k, v]) => h('div', null, h('kbd', null, k), h('span', null, v)))),
-        h('h3', null, 'Как тут жить'),
-        h('ul', { class: 'tips' },
-          h('li', null, 'Сначала собери хворост, камни и волокна, построй костёр и палатку. Потом верстак — и всё остальное откроется само.'),
-          h('li', null, 'Многие постройки дружат: ставь их вплотную. Дождесборник + бак, котелок у огня, ящик у курятника, дровница у костра.'),
-          h('li', null, 'Выбери постройку и подвигай курсор: цветные линии покажут, с чем она соединится.'),
-          h('li', null, 'Нажми на дом дважды — вход внутрь. Там расставляй мебель, картины и ковры. Хижине нужен дымоход снаружи для камина и плиты.'),
-          h('li', null, 'Потребности никогда не убивают — но с ними приятнее. Поспи, поешь горячего, посиди у огня.'),
-          h('li', null, 'Игра сохраняется сама. Можно закрыть вкладку и вернуться.')));
+      content.append(...helpView());
     }
   };
   draw(typeof tab === 'string' ? tab : 'goals');
@@ -224,14 +216,26 @@ export function openJournal(tab = 'goals', focus) {
   if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1800); }
 }
 const root = document.documentElement;
-const canFullscreen = !!(root.requestFullscreen || root.webkitRequestFullscreen);
-const isFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
-function toggleFullscreen() {
+export const canFullscreen = !!(root.requestFullscreen || root.webkitRequestFullscreen);
+export const isFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+export function toggleFullscreen() {
   const p = isFullscreen()
     ? (document.exitFullscreen || document.webkitExitFullscreen).call(document)
     : (root.requestFullscreen || root.webkitRequestFullscreen).call(root);
   p && p.catch && p.catch(() => toast('Не удалось открыть полный экран'));
 }
+// «Управление» и «Как тут жить»: общий вид для журнала и главного экрана
+export const helpView = () => [
+h('h3', null, 'Управление'), h('div', { class: 'ctrl' }, ...(isTouch() ? CONTROLS_TOUCH : CONTROLS_PC).map(([k, v]) => h('div', null, h('kbd', null, k), h('span', null, v)))),
+        h('h3', null, 'Как тут жить'),
+        h('ul', { class: 'tips' },
+          h('li', null, 'Сначала собери хворост, камни и волокна, построй костёр и палатку. Потом верстак — и всё остальное откроется само.'),
+          h('li', null, 'Многие постройки дружат: ставь их вплотную. Дождесборник + бак, котелок у огня, ящик у курятника, дровница у костра.'),
+          h('li', null, 'Выбери постройку и подвигай курсор: цветные линии покажут, с чем она соединится.'),
+          h('li', null, 'Нажми на дом дважды — вход внутрь. Там расставляй мебель, картины и ковры. Хижине нужен дымоход снаружи для камина и плиты.'),
+          h('li', null, 'Потребности никогда не убивают — но с ними приятнее. Поспи, поешь горячего, посиди у огня.'),
+          h('li', null, 'Игра сохраняется сама. Можно закрыть вкладку и вернуться.'))];
+export const openHelp = () => openModal('❓ Как играть', h('div', null, ...helpView()), { cls: 'wide' });
 export function openMenu() {
   const body = h('div', { class: 'menu' },
     h('button', { class: 'primary', onclick: () => closeModal() }, '▶ Продолжить'),
@@ -240,6 +244,7 @@ export function openMenu() {
     h('button', { onclick: openCloudMenu }, getMode() === 'cloud' ? '☁️ Облако: сохранено в аккаунте' : '☁️ Облачное сохранение'),
     canFullscreen && h('button', { onclick: () => { closeModal(); toggleFullscreen(); } }, isFullscreen() ? '🗗 Выйти из полного экрана' : '⛶ Во весь экран'),
     h('button', { onclick: () => { closeModal(); openJournal('help'); } }, '❓ Управление и подсказки'),
+    h('button', { onclick: () => S.hooks.toMenu && S.hooks.toMenu() }, '🏠 В главное меню'),
     h('button', { class: 'danger', onclick: () => askConfirm('🌱 Новая игра', 'Текущий остров будет удалён, и всё начнётся с самого начала.', 'Начать заново', () => S.hooks.newGame && S.hooks.newGame()) }, '🌱 Новая игра'),
     h('p', { class: 'muted' }, `День ${day() + 1} · автосохранение каждые 30 секунд`));
   openModal('⚙️ Меню', body, { cls: 'narrow' });

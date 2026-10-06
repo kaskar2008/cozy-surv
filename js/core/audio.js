@@ -1,5 +1,5 @@
 // Процедурный звук: мягкие эффекты, дождь, треск костра, тихая пентатоническая музыка.
-let ctx = null, master = null, noiseBuf = null, rainG = null, muted = false, musicT = 2, fireT = 0, cricketT = 3, chimeT = 20;
+let ctx = null, master = null, noiseBuf = null, rainG = null, muted = (() => { try { return localStorage.getItem('cozy-island-muted') === '1'; } catch (e) { return false; } })(), musicT = 2, fireT = 0, cricketT = 3, chimeT = 20;
 const PENTA = [0, 2, 4, 7, 9];
 let delay = null;
 
@@ -18,7 +18,7 @@ export function initAudio() {
   delay.connect(fb); fb.connect(delay); delay.connect(wet); wet.connect(master);
 }
 export const isMuted = () => muted;
-export function setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : .8; }
+export function setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : .8; try { localStorage.setItem('cozy-island-muted', m ? '1' : '0'); } catch (e) { } }
 
 function tone(freq, t0, dur, type = 'sine', vol = .1, dest, slide) {
   if (!ctx) return;

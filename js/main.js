@@ -22,6 +22,7 @@ import { buildHUD, updateHUD, setSpeed } from './ui/hud.js';
 import { buildBar, renderBar, updateCards } from './ui/buildbar.js';
 import { initPanel, updatePanel, clearSelection } from './ui/panel.js';
 import { openIntro } from './ui/modals.js';
+import { showMainMenu, hideMainMenu } from './ui/mainMenu.js';
 import { chooseStorage, resolveSave, watchConflicts, activateCloud } from './ui/cloud.js';
 import { toast } from './ui/ui.js';
 import { initInput, updateInput } from './input.js';
@@ -78,16 +79,26 @@ function frame(ts) {
   requestAnimationFrame(frame);
 }
 
+// «Новая игра» с главного экрана: убираем прежнее сохранение (и облачное тоже), дальше всё как при первом запуске
+async function discardSave() {
+  if (getMode() === 'cloud') { try { await cloud.init(); await cloud.deleteSave(); } catch (e) { } }
+  wipe(); setMode(null);
+}
+
 async function boot() {
   let fresh = false;
+  initEmoji();   // значки Twemoji сразу и в меню; картинки догружаются, пока игрок выбирает
+  const emojiReady = Promise.race([preloadEmoji(), new Promise((r) => setTimeout(r, 3000))]);   // готовы до первого кадра, но медленная сеть игру не держит
   const wantFresh = new URLSearchParams(location.search).has('fresh');
   if (wantFresh) history.replaceState(null, '', location.pathname);
-  const src = await resolveSave(wantFresh);   // локально — сразу; в облачном режиме — после входа в аккаунт
+  // ?fresh=1 (после «Новой игры» из игры) — сразу к выбору хранилища и приветствию; иначе — главный экран
+  const choice = wantFresh ? 'new' : await showMainMenu();
+  if (choice === 'new' && !wantFresh) await discardSave();
+  const src = await resolveSave(choice === 'new');   // локально — сразу; в облачном режиме — после входа в аккаунт
   if (src.raw && load(src.raw)) { /* продолжаем */ } else { newGame(); fresh = true; }
   const picker = fresh && src.picker;
   ensureLinks(); computeCozy();
-  await Promise.race([preloadEmoji(), new Promise((r) => setTimeout(r, 3000))]);   // значки готовы до первого кадра, но медленная сеть игру не держит
-  initEmoji();
+  await emojiReady;
   initUI(); buildHUD(); buildBar(); initPanel(); initInput(canvas);
   centerOn(G.player.x, G.player.y); cam.zoom = innerWidth < 700 ? 0.8 : 1.05;
   G.speed = G.speed ?? 1; if (G.speed === 0 && !fresh) G.speed = 1;
@@ -104,13 +115,17 @@ async function boot() {
     if (getMode() === 'cloud') { toast('Удаляю игру из облака…'); try { await cloud.deleteSave(); } catch (e) { } }
     wipe(); setMode(null); location.replace(location.pathname + '?fresh=1');
   };
+  S.hooks.toMenu = async () => { save(); try { await cloud.flush(); } catch (e) { } location.reload(); };
   S.hooks.onSceneChange = () => { clearSelection(); UI.tool = 'select'; UI.def = null; UI.fdef = null; R.ghost = null; renderBar(); };
+  if (fresh) { G.noSave = true; setSpeed(0); }
+  window.cozy = { skills, gl, enterHome, exitHome, placeFurn, furnActions, removeFurn, FDEF, worldToScreen, screenToWorld, rotateCam, quality: () => quality, G, S, api, BDEF, cam, R, UI, save, load, prof, syncProf: (on) => { hooks.sync = on ? () => ctx.getImageData(0, 0, 1, 1) : null; } };
+  requestAnimationFrame(frame);
+  // меню уходит, когда мир уже нарисован: первый кадр (сборка моделей) проходит под ним
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await hideMainMenu();
   if (fresh) {
-    G.noSave = true; setSpeed(0);
     const intro = () => openIntro(() => { delete G.noSave; setSpeed(1); save(); });
     picker ? chooseStorage(intro) : intro();
   }
-  window.cozy = { skills, gl, enterHome, exitHome, placeFurn, furnActions, removeFurn, FDEF, worldToScreen, screenToWorld, rotateCam, quality: () => quality, G, S, api, BDEF, cam, R, UI, save, load, prof, syncProf: (on) => { hooks.sync = on ? () => ctx.getImageData(0, 0, 1, 1) : null; } };
-  requestAnimationFrame(frame);
 }
 boot();

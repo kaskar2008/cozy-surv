@@ -213,3 +213,39 @@ small.lock { color: #b0652a; font-weight: 600; }
 
 /* эмодзи-картинки (Twemoji): масштабируются вместе с шрифтом */
 img.em { display: inline-block; width: 1.15em; height: 1.15em; vertical-align: -.2em; pointer-events: none; -webkit-user-drag: none; user-select: none; }
+
+/* главный экран */
+#mainmenu { position: fixed; inset: 0; z-index: 50; background: #4a9fbd; overflow: hidden; transition: opacity .7s ease; }
+#mainmenu.out { opacity: 0; pointer-events: none; }
+#menubg { position: absolute; inset: 0; display: block; }
+.mm-shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(25, 14, 40, .32), rgba(25, 14, 40, 0) 58%), radial-gradient(ellipse at 60% 55%, transparent 55%, rgba(25, 14, 40, .38)); }
+.mm-box { position: absolute; left: clamp(24px, 8vw, 150px); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 28px; width: min(360px, calc(100vw - 32px)); }
+.mm-logo { color: #fff; text-shadow: 0 2px 0 rgba(90, 50, 30, .45), 0 4px 22px rgba(40, 20, 50, .55); animation: mmin .9s cubic-bezier(.2, .9, .3, 1) both; }
+.mm-ic { font-size: 54px; line-height: 1; animation: mmbob 5s ease-in-out infinite; transform-origin: 50% 90%; } .mm-ic img.em { width: 1em; height: 1em; filter: drop-shadow(0 3px 6px rgba(40, 20, 50, .35)); }
+.mm-logo h1 { margin: 6px 0 4px; font-size: clamp(38px, 6.2vw, 62px); line-height: 1.02; letter-spacing: -.5px; font-weight: 800; }
+.mm-logo p { margin: 0; font-size: 16px; line-height: 1.4; opacity: .95; max-width: 320px; }
+.mm-btns { display: flex; flex-direction: column; gap: 10px; }
+.mm-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; padding: 12px 20px; font-size: 19px; font-weight: 700; text-align: left; border-radius: 18px; background: rgba(255, 248, 234, .86); border: 1px solid rgba(255, 255, 255, .55); box-shadow: 0 6px 20px rgba(30, 15, 40, .25); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); animation: mmin .7s cubic-bezier(.2, .9, .3, 1) both; transition: transform .15s, background .15s, box-shadow .15s; }
+.mm-btn:nth-child(1) { animation-delay: .25s; } .mm-btn:nth-child(2) { animation-delay: .33s; } .mm-btn:nth-child(3) { animation-delay: .41s; } .mm-btn:nth-child(4) { animation-delay: .49s; }
+.mm-btn small { font-weight: 500; font-size: 13px; }
+.mm-btn:hover:not(:disabled) { transform: translateX(6px); background: #fff; box-shadow: 0 8px 26px rgba(30, 15, 40, .32); }
+.mm-btn.primary { background: linear-gradient(#f9bd77, #e8934f); color: #fff; border-color: #f6c38a; text-shadow: 0 1px 0 rgba(120, 50, 10, .4); } .mm-btn.primary small { color: rgba(255, 255, 255, .92); }
+.mm-btn.primary:hover:not(:disabled) { background: linear-gradient(#ffc886, #f09d5a); }
+.mm-btn.loading { opacity: 1 !important; } .mm-btn.loading small { animation: mmpulse 1s infinite; }
+.mm-btn:disabled:not(.loading) { opacity: .55; }
+.mm-foot { position: absolute; right: 16px; bottom: 10px; font-size: 12px; color: rgba(255, 255, 255, .78); text-shadow: 0 1px 4px rgba(20, 10, 30, .6); }
+@keyframes mmin { from { opacity: 0; transform: translateY(14px); } }
+@keyframes mmbob { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg) translateY(-3px); } }
+@keyframes mmpulse { 50% { opacity: .4; } }
+@media (max-width: 700px) {
+  .mm-box { left: 50%; top: 0; bottom: 0; transform: translateX(-50%); justify-content: space-between; padding: max(5vh, 28px) 0 max(7vh, 44px); gap: 20px; align-items: stretch; text-align: center; } .mm-logo p { margin: 0 auto; }
+  .mm-ic { font-size: 44px; } .mm-btn { padding: 11px 18px; font-size: 18px; align-items: center; text-align: center; }
+  .mm-shade { background: linear-gradient(rgba(25, 14, 40, .25), rgba(25, 14, 40, .1) 40%, rgba(25, 14, 40, .3)); }
+  .mm-foot { right: 50%; transform: translateX(50%); white-space: nowrap; }
+}
+@media (max-height: 520px) {
+  .mm-box { left: 4vw; right: 4vw; top: 50%; bottom: auto; width: auto; flex-direction: row; align-items: center; justify-content: flex-start; padding: 0; gap: 24px; transform: translateY(-50%); text-align: left; } .mm-logo, .mm-btns { flex: 1; }
+  .mm-logo h1 { font-size: 34px; } .mm-ic { font-size: 36px; } .mm-logo p { display: none; } .mm-btns { gap: 6px; } .mm-btn { padding: 7px 16px; font-size: 16px; align-items: flex-start; text-align: left; }
+  .mm-foot { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .mm-ic, .mm-btn, .mm-logo { animation: none; } }
