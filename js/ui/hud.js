@@ -7,7 +7,7 @@ import { ITEMS, itemIcon } from '../data/items.js';
 import * as eco from '../game/eco.js';
 import { cozyLevel } from '../game/cozy.js';
 import { forecastOn } from '../game/skills.js';
-import { nextGoals } from '../game/goals.js';
+import { nextGoals, goalTask, goalProg, goalReward } from '../game/goals.js';
 import { UI } from './state.js';
 import { toast } from './ui.js';
 import { openInventory, openCraft, openJournal, openMenu, openNeeds } from './modals.js';
@@ -104,8 +104,8 @@ export function updateHUD(dt) {
   const sig = chips.map((c) => c.textContent).join('|');
   if (sig !== els.resSig) { els.resSig = sig; els.res.replaceChildren(...chips); }
   const g = nextGoals(2);
-  const hs = g.map((x) => x.id).join();
-  if (hs !== els.hintSig) { els.hintSig = hs; els.hint.replaceChildren(...g.map((x) => h('div', { class: 'gh', title: x.desc, onclick: () => openJournal('goals', x.id) }, h('span', null, x.ic), h('div', null, h('b', null, x.name), h('small', null, x.desc))))); els.hint.style.display = g.length ? 'flex' : 'none'; }
+  const hs = g.map((x) => x.id + (goalProg(x) || '')).join();
+  if (hs !== els.hintSig) { els.hintSig = hs; els.hint.replaceChildren(...g.map((x) => h('div', { class: 'gh', title: x.desc, onclick: () => openJournal('goals', x.id) }, h('span', null, x.ic), h('div', null, h('b', null, x.name), h('small', null, x.desc)), h('div', { class: 'gt' }, h('b', null, goalTask(x), goalProg(x) ? h('em', null, ' · ' + goalProg(x)) : null), h('small', null, 'Награда ' + goalReward(x)))))); els.hint.style.display = g.length ? 'flex' : 'none'; }
   // интерьер
   const home = homeOf();
   if (home) { const bsig = bldName(home) + G.cozy.total; if (els.bsig !== bsig) { els.bsig = bsig; els.banner.replaceChildren(h('span', null, '🏠 Внутри: ' + bldName(home)), h('button', { title: 'Поспать прямо на полу — без кровати хуже', onclick: () => { if (G.needs.energy > 92) toast('Совсем не хочется спать'); else startSleep('floor', 0.7); } }, '💤 Прилечь'), h('button', { onclick: exitHome }, '↩ Выйти из дома')); } els.banner.style.display = 'flex'; }

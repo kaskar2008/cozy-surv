@@ -64,8 +64,6 @@ const curDef = () => (inside() ? UI.fdef : UI.def);
 const pointers = new Map();
 let gesture = null, gestureEnd = 0;
 const mid = () => { const p = [...pointers.values()]; return { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2, d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1 }; };
-const FINGER_LIFT = 52; // призрак выше пальца, чтобы его было видно
-const liftFor = (d) => (UI.touch && !(d && d.drag && !inside()) ? FINGER_LIFT : 0);
 
 function onDown(e) {
   initAudio();
@@ -79,12 +77,12 @@ function onDown(e) {
   }
   keepBuild = e.shiftKey;      // Shift — не выходить из режима постройки
   const bd = UI.tool === 'build' ? curDef() : null;
-  UI.mouse.x = e.clientX; UI.mouse.y = e.clientY - liftFor(bd); UI.mouse.in = true;
+  if (!UI.touch) { UI.mouse.x = e.clientX; UI.mouse.y = e.clientY; UI.mouse.in = true; }
   if (G.player.sleeping) { api.wakeUp(); return; }
   if (e.button === 1 || e.button === 2) { drag = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, moved: false, btn: e.button }; return; }
   if (e.button !== 0) return;
   if (UI.modal) return;
-  if (UI.touch && !bd) {
+  if (UI.touch) {   // палец всегда двигает камеру; в режиме постройки касание без сдвига выбирает место призрака
     drag = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, moved: false, btn: 0, touch: true };
     return;
   }
@@ -92,7 +90,7 @@ function onDown(e) {
     updateGhost(true);
     placing = !!bd.drag && !inside();
     lastTile = ghostKey;
-    if (!UI.touch || placing) tryPlace();      // на тач-экране обычные постройки ставятся кнопкой «Поставить»
+    tryPlace();
     lastXY = R.ghost ? { x: R.ghost.x, y: R.ghost.y } : null;
     return;
   }
@@ -123,11 +121,12 @@ function onMove(e) {
       return;
     }
   }
-  const bd = UI.tool === 'build' ? curDef() : null;
-  UI.mouse.x = e.clientX; UI.mouse.y = e.clientY - (e.pointerType === 'touch' ? liftFor(bd) : 0);
-  const onCanvas = e.target === canvas;
-  if (onCanvas && !UI.mouse.in) hideTip();
-  UI.mouse.in = onCanvas;
+  if (e.pointerType !== 'touch') {
+    UI.mouse.x = e.clientX; UI.mouse.y = e.clientY;
+    const onCanvas = e.target === canvas;
+    if (onCanvas && !UI.mouse.in) hideTip();
+    UI.mouse.in = onCanvas;
+  }
   if (drag) {
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (Math.abs(dx) + Math.abs(dy) > (drag.touch ? 9 : 4)) drag.moved = true;
@@ -147,7 +146,7 @@ function onMove(e) {
       if (!n) tryPlace(true);
       lastXY = { x: g.x, y: g.y }; updateCards(); ghostKey = ''; updateGhost(true);
     }
-  } else if (UI.touch && bd && e.target === canvas && e.pressure !== 0) updateGhost(true);
+  }
 }
 function onUp(e) {
   initAudio();
@@ -159,7 +158,10 @@ function onUp(e) {
   }
   if (drag && e.button === drag.btn) {
     const d0 = drag; drag = null;
-    if (!d0.moved && d0.touch) tap(e.clientX, e.clientY);
+    if (!d0.moved && d0.touch) {
+      if (UI.tool === 'build' && curDef()) { UI.mouse.x = e.clientX; UI.mouse.y = e.clientY; UI.mouse.in = true; updateGhost(true); }
+      else tap(e.clientX, e.clientY);
+    }
     else if (!d0.moved && e.button === 2) { if (UI.tool !== 'select') cancelBuild(); else clearSelection(); }
   }
   if (e.button === 0) { placing = false; afterPlace(); }
@@ -208,7 +210,9 @@ function clampCam() {
 // ---------------------------------------------------------------- призрак
 export function updateGhost(force) {
   const d = curDef();
-  if (UI.tool !== 'build' || !d || !UI.mouse.in || UI.modal || drag) { R.ghost = null; R.grid = false; if (!d || UI.tool !== 'build') hideTip(); return; }
+  // на тач-экране призрак стоит в точке касания, а карта едет под ним; пока места не выбрано — по центру
+  if (UI.touch && UI.tool === 'build' && !UI.mouse.in) { UI.mouse.x = cam.W / 2; UI.mouse.y = cam.H * .4; UI.mouse.in = true; }
+  if (UI.tool !== 'build' || !d || !UI.mouse.in || UI.modal || (drag && !drag.touch)) { R.ghost = null; R.grid = false; if (!d || UI.tool !== 'build') hideTip(); return; }
   const mx = UI.mouse.x, my = UI.mouse.y;
   if (inside()) {
     const home = homeOf(); if (!home) return;
@@ -255,7 +259,7 @@ function tryPlace(quiet) {
 function afterPlace() {
   if (placing || !placedOne) return;
   placedOne = false;
-  if (!keepBuild && UI.tool === 'build') cancelBuild();
+  if (!keepBuild && UI.tool === 'build' && !(UI.touch && !inside() && curDef()?.drag)) cancelBuild();   // дорожки и заборы на телефоне ставятся подряд — выход кнопкой ✕
 }
 
 // ---------------------------------------------------------------- выбор объектов

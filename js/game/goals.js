@@ -71,4 +71,14 @@ export function checkGoals() {
     S.hooks.onGoal && S.hooks.onGoal(g);
   }
 }
+// Короткая формулировка для компактной плашки: первое предложение описания; прогресс — у целей со счётчиком.
+const PROG = {
+  gather: () => [st('gathered'), 10], furnish: () => [st('furn'), 3], fish: () => [st('fish'), 3], letters: () => [st('letters'), 3], garden: () => [st('harvested'), 10],
+  lights: () => [[...G.bMap.values()].filter((b) => BDEF[b.t].light).length, 3],
+  cozy40: () => [G.cozy.total, 40], cozy100: () => [G.cozy.total, 100], cozy200: () => [G.cozy.total, 200],
+  explore30: () => [exploredPct() * 100, 30], explore60: () => [exploredPct() * 100, 60], explore95: () => [exploredPct() * 100, 95],
+};
+export const goalTask = (g) => g.desc.split(/(?<=[.!…:])\s/)[0].replace(/[.:…]$/, '');
+export function goalProg(g) { try { const p = PROG[g.id]; if (!p) return null; const [c, m] = p(); return `${Math.min(m, Math.floor(c))}/${m}`; } catch (e) { return null; } }
+export const goalReward = (g) => Object.entries(g.reward).map(([k, v]) => `+${v}${itemIcon(k)}`).join(' ');
 export const nextGoals = (n = 3) => GOALS.filter((g) => !G.goals[g.id]).slice(0, n);
