@@ -34,7 +34,7 @@ export function initInput(cv) {
   addEventListener('pointerup', onUp);
   addEventListener('pointercancel', onUp);
   cv.addEventListener('pointerleave', (e) => { if (e.pointerType === 'touch') return; UI.mouse.in = false; R.ghost = null; R.hover = null; hideTip(); });
-  cv.addEventListener('pointerenter', () => { UI.mouse.in = true; });
+  cv.addEventListener('pointerenter', (e) => { if (e.pointerType !== 'touch') UI.mouse.in = true; });   // палец не мышь: иначе призрак прыгает в угол (0,0)
   cv.addEventListener('wheel', onWheel, { passive: false });
   addEventListener('keydown', onKey);
   addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));

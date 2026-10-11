@@ -64,7 +64,7 @@ function pickDef(d, ins) {
   if (lock) { toast(lock, 'warn'); sfx('no'); return; }
   if ((ins ? UI.fdef : UI.def) === d) { setTool('select'); return; }
   UI.tool = 'build'; if (ins) { UI.fdef = d; UI.def = null; } else { UI.def = d; UI.fdef = null; }
-  UI.rot = 0; R.ghost = null; renderBar(true); sfx('ui');
+  UI.rot = 0; R.ghost = null; if (UI.touch) UI.mouse.in = false; renderBar(true); sfx('ui');   // на телефоне новый призрак снова встаёт по центру
 }
 function tipHtml(d, ins) {
   const cost = Object.entries(d.cost).map(([k, v]) => `<span class="${eco.count(k) >= v ? '' : 'miss'}">${v}${itemIcon(k)} ${itemName(k)}</span>`).join(' · ') || 'бесплатно';
