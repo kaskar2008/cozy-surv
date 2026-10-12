@@ -40,7 +40,9 @@ function recipesUI(holder, stationKey, def) {
   const heatOk = stationHeatOk(holder, stationKey);
   if (st.heat === 'self' && !heatOk) wrap.append(h('div', { class: 'warn' }, '🔥 Сначала разведи огонь'));
   if (st.heat === 'near' && !heatOk) wrap.append(h('div', { class: 'warn' }, '❄️ Нужен горящий огонь вплотную к станции (костёр, плита)'));
-  if (cur) { const r = STATIONS[cur.st].recipes[cur.idx], pct = q(100 * (1 - cur.left / cur.total), 5); wrap.append(h('div', { class: 'craftcur' }, h('span', null, `${itemIcon(Object.keys(r.out)[0])} Готовится… ${holder.st.paused ? '(пауза: нет огня)' : ''}${holder.st.q ? ` · в очереди ещё ${holder.st.q}` : ''}`), h('div', { class: 'bar' }, h('i', { style: `width:${pct}%;background:#e0a24a` })))); }
+  if (cur) { const r = STATIONS[cur.st].recipes[cur.idx], pct = q(100 * (1 - cur.left / cur.total), 5); wrap.append(h('div', { class: 'craftcur' }, h('span', null, `${itemIcon(Object.keys(r.out)[0])} Готовится… ${holder.st.paused ? '(пауза: нет огня)' : ''}`), h('div', { class: 'bar' }, h('i', { style: `width:${pct}%;background:#e0a24a` })))); }
+  const queue = holder.st.queue || [];
+  if (queue.length) wrap.append(h('div', { class: 'craftq' }, h('small', null, `В очереди (${queue.length}/${api.QUEUE_MAX}):`), ...queue.map((qi, i) => h('button', { class: 'qchip', title: 'Убрать из очереди', onclick: () => { api.cancelQueued(holder, i); renderPanel(true); } }, itemIcon(Object.keys(st.recipes[qi].out)[0]), h('i', null, '✕')))));
   st.recipes.forEach((r, idx) => {
     if (r.hidden) return;
     const name = r.name || Object.keys(r.out).map((k) => ITEMS[k].n).join(', ');
@@ -48,9 +50,9 @@ function recipesUI(holder, stationKey, def) {
     const can = canCraft(holder, stationKey, r) && !(r.once && Object.keys(r.out).every((k) => eco.has(k)));
     const busy = !!cur && cur.st === stationKey && cur.idx === idx;
     const row = h('div', { class: 'recipe' + (can || busy ? '' : ' off') + (busy ? ' cooking' : ''), style: busy ? `--p:${(100 * (1 - cur.left / cur.total)).toFixed(1)}%` : null },
-      h('div', { class: 'r-out' }, h('span', { class: 'big' }, itemIcon(Object.keys(r.out)[0])), h('div', null, h('b', null, name + (Object.values(r.out)[0] > 1 ? ` ×${Object.values(r.out)[0]}` : '')), h('small', null, `⏱ ${r.t} с`), recipeLock(r) ? h('small', { class: 'lock' }, '🔒 ' + lockText(r)) : null, busy && holder.st.q > 0 ? h('small', { class: 'qleft' }, `Осталось: ${holder.st.q + 1}`) : null)),
+      h('div', { class: 'r-out' }, h('span', { class: 'big' }, itemIcon(Object.keys(r.out)[0])), h('div', null, h('b', null, name + (Object.values(r.out)[0] > 1 ? ` ×${Object.values(r.out)[0]}` : '')), h('small', null, `⏱ ${r.t} с`), recipeLock(r) ? h('small', { class: 'lock' }, '🔒 ' + lockText(r)) : null)),
       h('div', { class: 'r-in' }, ...Object.entries(r.in).map(([k, n]) => h('span', { class: 'chip ' + (have(k, n) ? '' : 'miss') }, `${n}${itemIcon(k)}`))),
-      h('div', { class: 'r-btn' }, h('button', { disabled: !!cur || !can, onclick: () => { api.startCraft(holder, stationKey, idx, 1); renderPanel(true); } }, 'Сделать'), r.once ? null : h('button', { class: 'sm', disabled: !!cur || !can, title: 'Поставить в очередь ×3', onclick: () => { api.startCraft(holder, stationKey, idx, 3); renderPanel(true); } }, '×3')));
+      h('div', { class: 'r-btn' }, h('button', { disabled: !can, onclick: () => { api.startCraft(holder, stationKey, idx, 1); renderPanel(true); } }, cur ? 'В очередь' : 'Сделать'), r.once ? null : h('button', { class: 'sm', disabled: !can, title: 'Поставить в очередь ×3', onclick: () => { api.startCraft(holder, stationKey, idx, 3); renderPanel(true); } }, '×3')));
     wrap.append(row);
   });
   return wrap;
@@ -201,7 +203,7 @@ export function renderPanel(force) {
   else if (sel.kind === 'furn') m = describeFurn(sel);
   if (!m) { clearSelection(); return; }
   if (m.station) { const pr = workProgress(m.station.holder, { station: m.station.key }); const row = root.querySelector('.recipe.cooking'); if (pr && row) row.style.setProperty('--p', (100 * pr.p).toFixed(1) + '%'); }
-  const sig = JSON.stringify([m.title, m.lines, m.bars, m.acts.map((a) => [a.label, a.off, a.sub]), m.station && m.station.holder.st.cur ? [m.station.holder.st.cur.left | 0, m.station.holder.st.q] : null, m.station ? Object.keys(G.inv).map((k) => G.inv[k]).join() : '', m.links ? m.links.length : 0]);
+  const sig = JSON.stringify([m.title, m.lines, m.bars, m.acts.map((a) => [a.label, a.off, a.sub]), m.station ? [m.station.holder.st.cur ? m.station.holder.st.cur.left | 0 : -1, (m.station.holder.st.queue || []).join()] : null, m.station ? Object.keys(G.inv).map((k) => G.inv[k]).join() : '', m.links ? m.links.length : 0]);
   if (!force && sig === sigLast) return;
   sigLast = sig;
   root.style.display = 'block';

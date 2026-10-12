@@ -186,7 +186,8 @@ function updateBurner(b, def, dt) {
 }
 export function updateStation(b, def, dt) {
   const st = b.st, cur = st.cur;
-  if (!cur) return;
+  if (st.q) { st.queue = Array(st.q).fill(cur ? cur.idx : 0); st.q = 0; } // старые сохранения: счётчик → очередь
+  if (!cur) { if (st.queue && st.queue.length) startNextQueued(b, def, st); return; }
   const sdef = STATIONS[cur.st];
   if (!stationHeatOk(b, cur.st)) { st.paused = true; return; }
   st.paused = false;
@@ -212,7 +213,15 @@ export function updateStation(b, def, dt) {
   stat('crafted'); if (['campfire', 'pot', 'kettle', 'oven', 'stove', 'ferment', 'smoker', 'drying'].includes(cur.st)) { stat('cooked'); (G.stats.cookedItems ||= {})[outKey] = 1; }
   if (cur.st === 'easel') stat('paintings');
   st.cur = null;
-  if (st.q > 0) { st.q--; if (stationHeatOk(b, cur.st) && canCraft(b, cur.st, r)) S.startCraft(b, cur.st, cur.idx, st.q + 1); else st.q = 0; }
+  if (st.queue && st.queue.length) startNextQueued(b, def, st);
+}
+// берёт из очереди следующий рецепт; без огня ждёт, без ингредиентов — выкидывает пункт
+function startNextQueued(b, def, st) {
+  const key = def.station, idx = st.queue[0], r = STATIONS[key].recipes[idx];
+  if (!stationHeatOk(b, key)) return;
+  st.queue.shift();
+  if (canCraft(b, key, r)) S.startCraft(b, key, idx, 1);
+  else if (Math.hypot(G.player.x - b.x, G.player.y - b.y) < 12 || G.scene !== 'world') toast(`Из очереди убрано: не хватило ингредиентов ${itemIcon(Object.keys(r.out)[0])}`, 'warn');
 }
 function updateCrops(b, def, dt) {
   const gh = def.tags.includes('greenhouse'), s = season(), rainy = G.weather.type === 'rain';

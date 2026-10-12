@@ -441,18 +441,29 @@ export function stationHeatOk(b, station) {
   if (st.heat === 'near') return heated(b);
   return true;
 }
+export const QUEUE_MAX = 10;
 export function startCraft(b, station, idx, qty = 1) {
   const st = STATIONS[station], r = st.recipes[idx];
-  if (b.st.cur) { toast('Станция занята'); return; }
   if (r.once && Object.keys(r.out).every((k) => eco.has(k))) { toast('У тебя уже есть такой инструмент'); return; }
   if (recipeLock(r)) { toast('Рецепт откроется с навыком: ' + lockText(r), 'warn'); return; }
   if (!stationHeatOk(b, station)) { toast(st.heat === 'self' ? 'Сначала разведи огонь' : 'Нужен горящий огонь вплотную к станции', 'warn'); return; }
   if (!canCraft(b, station, r)) { toast('Не хватает ингредиентов', 'warn'); return; }
+  if (b.st.cur) {
+    const queue = (b.st.queue ||= []);
+    if (r.once && (b.st.cur.idx === idx || queue.includes(idx))) { toast('Этот инструмент уже готовится'); return; }
+    const n = Math.min(qty, QUEUE_MAX - queue.length);
+    if (n <= 0) { toast('Очередь заполнена'); return; }
+    for (let i = 0; i < n; i++) queue.push(idx);
+    sfx('ui'); return;
+  }
   consumeFor(b, station, r);
   const heatBoost = (st.heatBoost && heated(b) ? 2 : 1) / (COOKING.has(station) ? 1 - bonus('cook', 'speed') : 1);
   b.st.cur = { st: station, idx, left: r.t / heatBoost, total: r.t / heatBoost };
-  b.st.q = Math.max(0, qty - 1); sfx('craft');
+  const queue = (b.st.queue ||= []);
+  for (let i = 1; i < qty && queue.length < QUEUE_MAX; i++) queue.push(idx);
+  sfx('craft');
 }
+export function cancelQueued(b, i) { if (b.st.queue) b.st.queue.splice(i, 1); }
 export function handCraft(idx) {
   const r = STATIONS.hand.recipes[idx];
   if (r.once && Object.keys(r.out).every((k) => eco.has(k))) { toast('У тебя уже есть такой инструмент'); return; }
@@ -676,4 +687,4 @@ export function flowersNear(b, r = 6) {
   return k;
 }
 export function count(t) { let k = 0; for (const b of G.bMap.values()) if (b.t === t) k++; return k; }
-Object.assign(S, { has: eco.has, add: eco.add, take: eco.take, netOf, netAdd, netTake, isHot, heated, flowersNear, count, stat, addBuff, buffSum, takeWaterFor, waterAvailable, startCraft });
+Object.assign(S, { has: eco.has, add: eco.add, take: eco.take, netOf, netAdd, netTake, isHot, heated, flowersNear, count, stat, addBuff, buffSum, takeWaterFor, waterAvailable, startCraft, cancelQueued });

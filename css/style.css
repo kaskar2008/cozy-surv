@@ -80,7 +80,11 @@ small { color: var(--ink2); font-size: 12px; }
 .recipe { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, .5); }
 .recipe.off { opacity: .6; }
 .recipe { position: relative; overflow: hidden; }
-.recipe .qleft { display: block; margin-top: 2px; color: #a8651a; font-weight: 700; }
+.craftq { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 6px; }
+.craftq small { color: #a8651a; font-weight: 700; margin-right: 2px; }
+.qchip { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; border-radius: 8px; border: 1px solid rgba(224, 162, 74, .6); background: rgba(255, 255, 255, .6); font-size: 14px; cursor: pointer; }
+.qchip i { font-style: normal; font-size: 10px; opacity: .55; }
+.qchip:hover i { opacity: 1; }
 .recipe.cooking { border-color: rgba(224, 162, 74, .8); background: linear-gradient(90deg, rgba(240, 180, 90, .55) var(--p, 0%), rgba(255, 255, 255, .5) var(--p, 0%)); }
 .recipe .r-out { display: flex; gap: 8px; align-items: center; } .recipe .big { font-size: 24px; }
 .recipe .r-btn { grid-row: span 2; display: flex; flex-direction: column; gap: 4px; justify-content: center; } .recipe .r-btn button { padding: 4px 9px; font-size: 13px; } .recipe .r-btn .sm { padding: 2px 6px; font-size: 11px; }
