@@ -312,7 +312,7 @@ const nearWaterTile = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx =
 
 function onNewSeason() {
   const s = season();
-  toast(`Наступила ${['весна 🌱', 'лето ☀️', 'осень 🍂', 'зима ❄️'][s]}`);
+  toast(['Наступила весна 🌱', 'Наступило лето ☀️', 'Наступила осень 🍂', 'Наступила зима ❄️'][s]);
   if (s === 3 && G.weather.type === 'rain') G.weather.type = 'snow';
   if (s !== 3 && G.weather.type === 'snow') G.weather.type = 'cloudy';
   if (s !== 3) for (const b of [...G.bMap.values()]) if (b.t === 'snowman') { removeBld(b); toast('Снеговик растаял… до следующей зимы ☃️'); }
