@@ -15,8 +15,8 @@ reg([
     draw(c) { shadow(c, .5, .5, .42, .18); box(c, .1, .1, 0, .8, .8, 18, '#b98557', { tex: 'planks' }); box(c, .06, .06, 18, .88, .88, 3, '#a8734a'); for (const x of [.1, .78]) box(c, x, .1, 0, .12, .8, 18, '#8b5a3a', { top: '#8b5a3a' }); },
   },
   {
-    id: 'barrel', name: 'Бочка', cat: 'store', icon: '🛢️', cost: { planks: 4, rope: 1 }, req: ['workbench'], h: 40, cozy: 1,
-    desc: 'Бочка для воды и припасов: можно носить с собой больше воды.',
+    id: 'barrel', name: 'Бочка', cat: 'store', icon: '🪣', cost: { planks: 4, rope: 1 }, req: ['workbench'], h: 40, cozy: 1,
+    desc: 'Запас для рюкзака: каждая бочка добавляет +10 к лимиту воды и материалов. К водопроводу не подключается — для этого нужен бак.',
     tags: ['storage'], cap: { drink: 10, mat: 10 },
     draw(c) { shadow(c, .5, .5, .36, .18); cyl(c, .5, .5, 0, .32, 28, '#8b5e3c', { rings: [.2, .8], ringCol: '#4a3a30', top: '#5a3d26' }); },
   },
